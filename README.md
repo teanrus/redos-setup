@@ -70,12 +70,6 @@
 - Автоматическая проверка обновлений скрипта
 - Контрольные суммы для проверки целостности файлов
 - Доступно из любой точки мира
-- URL для загрузки:
-
-text
-https://github.com/teanrus/redos-setup/releases/latest/download/pack.tar.gz
-https://github.com/teanrus/redos-setup/releases/latest/download/1c.tar.gz
-
 2. 🏢 Локальная сеть (SMB)
 Преимущества:
 - Высокая скорость загрузки внутри локальной сети
