@@ -7,6 +7,6 @@
 ## Быстрая установка
 ```bash
 # Скачать и запустить скрипт
-curl -L -O https://github.com/ВАШ_НИК/redos-setup/releases/latest/download/setup.sh
+curl -L -O https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
 chmod +x setup.sh
 sudo ./setup.sh
