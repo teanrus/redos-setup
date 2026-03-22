@@ -27,8 +27,8 @@ sudo ./setup.sh
 
 ### 4. 💻 Установка основного ПО
 - pavucontrol - Управление звуком (микшер PulseAudio)
-- [r7-office](https://r7-office.ru/) - Офисный пакет R7 Office (аналог Microsoft Office)
-- [yandex-browser-stable](https://browser.yandex.ru/) - Яндекс.Браузер для организаций
+- r7-office - Офисный пакет [R7 Office](https://r7-office.ru/) (аналог Microsoft Office)
+- yandex-browser-stable - [Яндекс.Браузер](https://browser.yandex.ru/) для организаций
 - sshfs - Монтирование удаленных директорий через SSH
 - pinta - Графический редактор (аналог Paint.NET)
 - perl-Getopt-Long - Модуль Perl для работы Kaspersky
