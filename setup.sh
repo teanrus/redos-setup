@@ -1,7 +1,7 @@
 #!/bin/bash
 # Автоматизированная настройка РЕД ОС 7.3
 # GitHub: https://github.com/teanrus/redos-setup
-# Версия: 1.2
+# Версия: 1.3
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
-GITHUB_TAG="v1.2"  # Для production использовать "latest"
+GITHUB_TAG="v1.3"
 
 # === ФУНКЦИИ ===
 
@@ -72,13 +72,11 @@ download_from_github() {
     echo -e "${BLUE}Загрузка $file_name из GitHub...${NC}"
     echo -e "${BLUE}URL: $url${NC}"
     
-    # Проверка доступности файла
     if ! curl -s --head "$url" | grep -E "200|302|301" > /dev/null; then
         echo -e "${RED}✗ Файл $file_name не найден на GitHub${NC}"
         return 1
     fi
     
-    # Скачивание с прогрессом
     if wget --progress=bar:force -O "$dest_dir/$file_name" "$url" 2>&1; then
         echo -e "${GREEN}✓ $file_name успешно загружен (размер: $(numfmt --to=iec $(stat -c %s "$dest_dir/$file_name" 2>/dev/null)))${NC}"
         return 0
@@ -88,7 +86,7 @@ download_from_github() {
     fi
 }
 
-# Функция скачивания через SMB (локальная сеть)
+# Функция скачивания через SMB
 download_from_smb() {
     local server=$1
     local share=$2
@@ -152,9 +150,88 @@ confirm_installation() {
     fi
 }
 
+# Функция настройки DNS для ViPNet (только для департамента образования)
+setup_vipnet_dns() {
+    echo -e "${GREEN}=== Настройка DNS для ViPNet (департамент образования) ===${NC}"
+    
+    # Проверка наличия файла конфигурации
+    if [ ! -f "/etc/vipnet.conf" ]; then
+        echo -e "${RED}✗ Файл /etc/vipnet.conf не найден${NC}"
+        echo -e "${YELLOW}ViPNet не установлен в системе. Настройка DNS невозможна.${NC}"
+        return 1
+    fi
+    
+    # Создание резервной копии
+    echo -e "${BLUE}Создание резервной копии /etc/vipnet.conf...${NC}"
+    cp /etc/vipnet.conf /etc/vipnet.conf.backup.$(date +%Y%m%d_%H%M%S)
+    check_success "Создание резервной копии ViPNet конфигурации"
+    
+    # Замена DNS-серверов на корпоративные (департамент образования)
+    echo -e "${BLUE}Замена DNS-серверов на корпоративные (департамент образования)...${NC}"
+    echo -e "${YELLOW}Старые DNS: 77.88.8.88,77.88.8.2${NC}"
+    echo -e "${YELLOW}Новые DNS: 10.13.60.2,10.14.100.222${NC}"
+    
+    sed -i 's/77.88.8.88,77.88.8.2/10.13.60.2,10.14.100.222/' /etc/vipnet.conf
+    check_success "Замена DNS-серверов"
+    
+    # Включение параметра iptables=off
+    echo -e "${BLUE}Включение параметра iptables=off...${NC}"
+    
+    if grep -q ";iptables=off" /etc/vipnet.conf; then
+        sed -i 's/;iptables=off/iptables=off/' /etc/vipnet.conf
+        echo -e "${GREEN}✓ Параметр iptables=off раскомментирован${NC}"
+    elif grep -q "iptables=off" /etc/vipnet.conf; then
+        echo -e "${GREEN}✓ Параметр iptables=off уже активен${NC}"
+    else
+        echo "iptables=off" >> /etc/vipnet.conf
+        echo -e "${GREEN}✓ Параметр iptables=off добавлен в конфигурацию${NC}"
+    fi
+    check_success "Настройка параметра iptables"
+    
+    # Проверка конфигурации
+    echo -e "${BLUE}Проверка изменений в конфигурации...${NC}"
+    echo -e "${YELLOW}Текущие DNS в конфигурации:${NC}"
+    grep -E "^(;|)nameserver|dns" /etc/vipnet.conf | head -3
+    
+    echo -e "${YELLOW}Состояние параметра iptables:${NC}"
+    grep "iptables" /etc/vipnet.conf
+    
+    # Предложение перезапустить ViPNet
+    echo -e "${GREEN}✓ Настройка DNS для ViPNet завершена${NC}"
+    echo -e "${YELLOW}Для применения изменений рекомендуется перезапустить ViPNet:${NC}"
+    echo -e "${BLUE}  systemctl restart vipnet${NC}"
+    echo -e "${YELLOW}Или перезагрузить систему.${NC}"
+    
+    return 0
+}
+
+# Функция установки ViPNet
+install_vipnet() {
+    echo -e "${GREEN}=== Установка ViPNet ===${NC}"
+    
+    # Здесь будет логика установки ViPNet
+    # Например, установка из локального репозитория или скачивание
+    
+    echo -e "${BLUE}Поиск установочных файлов ViPNet...${NC}"
+    
+    # Проверяем наличие установочного файла
+    if [ -f "$WORK_DIR/vipnet_install.sh" ]; then
+        echo -e "${BLUE}Найден установочный файл ViPNet, запускаю установку...${NC}"
+        chmod +x "$WORK_DIR/vipnet_install.sh"
+        ./"$WORK_DIR/vipnet_install.sh"
+        check_success "Установка ViPNet"
+    else
+        echo -e "${YELLOW}Установочный файл ViPNet не найден в $WORK_DIR${NC}"
+        echo -e "${YELLOW}Пропускаем установку ViPNet${NC}"
+        return 1
+    fi
+    
+    return 0
+}
+
 # Функция проверки обновлений
 check_for_updates() {
-    local current_version="1.2"
+    local current_version="1.3"
     local latest_version
     
     echo -e "${BLUE}Проверка обновлений...${NC}"
@@ -338,17 +415,25 @@ if ls *.rpm 1> /dev/null 2>&1; then
     check_success "Установка локальных RPM"
 fi
 
-# === НАСТРОЙКА VIPNET ===
+# === УСТАНОВКА VIPNET ===
 if confirm_installation "ViPNet"; then
-    if [ -f "/etc/vipnet.conf" ]; then
-        sed -i 's/77.88.8.88,77.88.8.2/10.13.60.2,10.14.100.222,77.88.8.8/' /etc/vipnet.conf
-        sed -i 's/;iptables=off/iptables=off/' /etc/vipnet.conf
-        check_success "Настройка ViPNet"
-    else
-        echo -e "${RED}✗ Файл /etc/vipnet.conf не найден${NC}"
-    fi
+    install_vipnet
 else
-    echo -e "${YELLOW}Пропускаем настройку ViPNet${NC}"
+    echo -e "${YELLOW}Пропускаем установку ViPNet${NC}"
+fi
+
+# === НАСТРОЙКА DNS ДЛЯ VIPNET (ТОЛЬКО ДЛЯ ДЕПАРТАМЕНТА ОБРАЗОВАНИЯ) ===
+echo -e "${GREEN}=== Настройка DNS для ViPNet ===${NC}"
+echo -e "${YELLOW}Внимание! Замена DNS на корпоративные (10.13.60.2, 10.14.100.222)${NC}"
+echo -e "${YELLOW}необходима ТОЛЬКО для работы в локальной сети департамента образования.${NC}"
+echo -e "${YELLOW}Если вы работаете в другой сети или через интернет, оставьте DNS без изменений.${NC}"
+echo -e "${YELLOW}Заменить DNS на корпоративные? (y/n)${NC}"
+read -r configure_dns
+
+if [[ $configure_dns =~ ^[Yy]$ ]]; then
+    setup_vipnet_dns
+else
+    echo -e "${YELLOW}Пропускаем настройку DNS. DNS-серверы остаются без изменений.${NC}"
 fi
 
 # === УСТАНОВКА КРИПТОПРО И ДОПОЛНИТЕЛЬНЫХ ПАКЕТОВ ===
