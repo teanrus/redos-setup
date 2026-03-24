@@ -11,12 +11,12 @@
 ### 📋 Быстрая установка
 
 ```bash
-curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.3/setup.sh | sudo bash
+curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.4/setup.sh | sudo bash
 ```
 
 #### Или с сохранением файла:
 ```bash
-wget https://github.com/teanrus/redos-setup/releases/download/v2.3/setup.sh
+wget https://github.com/teanrus/redos-setup/releases/download/v2.4/setup.sh
 chmod +x setup.sh
 sudo ./setup.sh
 ```
