@@ -1,7 +1,7 @@
 #!/bin/bash
 # Автоматизированная настройка РЕД ОС 7.3
 # GitHub: https://github.com/teanrus/redos-setup
-# Версия: 1.3
+# Версия: 2.1
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
-GITHUB_TAG="v1.3"
+GITHUB_TAG="v1.0"
 
 # === ФУНКЦИИ ===
 
@@ -56,82 +56,16 @@ show_progress() {
 download_from_github() {
     local file_name=$1
     local dest_dir=$2
-    local use_release=${3:-true}
     
-    local url
-    if [ "$use_release" = true ]; then
-        if [ "$GITHUB_TAG" = "latest" ]; then
-            url="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$file_name"
-        else
-            url="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$GITHUB_TAG/$file_name"
-        fi
-    else
-        url="https://raw.githubusercontent.com/$GITHUB_USER/$GITHUB_REPO/main/$file_name"
-    fi
+    local url="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$GITHUB_TAG/$file_name"
     
-    echo -e "${BLUE}Загрузка $file_name из GitHub...${NC}"
-    echo -e "${BLUE}URL: $url${NC}"
-    
-    if ! curl -s --head "$url" | grep -E "200|302|301" > /dev/null; then
-        echo -e "${RED}✗ Файл $file_name не найден на GitHub${NC}"
-        return 1
-    fi
+    echo -e "${BLUE}Загрузка $file_name...${NC}"
     
     if wget --progress=bar:force -O "$dest_dir/$file_name" "$url" 2>&1; then
-        echo -e "${GREEN}✓ $file_name успешно загружен (размер: $(numfmt --to=iec $(stat -c %s "$dest_dir/$file_name" 2>/dev/null)))${NC}"
+        echo -e "${GREEN}✓ $file_name успешно загружен${NC}"
         return 0
     else
         echo -e "${RED}✗ Ошибка загрузки $file_name${NC}"
-        return 1
-    fi
-}
-
-# Функция скачивания через SMB
-download_from_smb() {
-    local server=$1
-    local share=$2
-    local user=$3
-    local file=$4
-    local dest=$5
-    
-    echo -e "${BLUE}Скачивание $file из локальной сети...${NC}"
-    
-    smbclient "//$server/$share" -U "$user" -c "prompt OFF; get $file $dest" &
-    local smb_pid=$!
-    
-    show_progress $smb_pid
-    wait $smb_pid
-    
-    if [ $? -eq 0 ] && [ -f "$dest" ]; then
-        echo -e "${GREEN}✓ $file успешно скачан${NC}"
-        return 0
-    else
-        echo -e "${RED}✗ Ошибка скачивания $file${NC}"
-        return 1
-    fi
-}
-
-# Функция для вставки строки перед exit 0
-insert_before_exit() {
-    local file=$1
-    local line=$2
-    
-    if [ -f "$file" ]; then
-        local temp_file=$(mktemp)
-        
-        while IFS= read -r file_line; do
-            if [[ "$file_line" =~ ^[[:space:]]*exit[[:space:]]+0 ]]; then
-                echo "$line" >> "$temp_file"
-            fi
-            echo "$file_line" >> "$temp_file"
-        done < "$file"
-        
-        mv "$temp_file" "$file"
-        chmod --reference="$file" "$file" 2>/dev/null || chmod 755 "$file"
-        
-        echo -e "${GREEN}✓ Строка добавлена перед exit 0 в $file${NC}"
-    else
-        echo -e "${RED}✗ Файл $file не найден${NC}"
         return 1
     fi
 }
@@ -150,115 +84,215 @@ confirm_installation() {
     fi
 }
 
-# Функция настройки DNS для ViPNet (только для департамента образования)
-setup_vipnet_dns() {
-    echo -e "${GREEN}=== Настройка DNS для ViPNet (департамент образования) ===${NC}"
+# Функция выбора версии ViPNet
+select_vipnet_version() {
+    echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}"
+    echo "1. ViPNet Client (без деловой почты)"
+    echo "2. ViPNet + Деловая почта (DP)"
+    echo -e "${YELLOW}Выберите вариант (1 или 2):${NC}"
+    read -r vipnet_choice
     
-    # Проверка наличия файла конфигурации
-    if [ ! -f "/etc/vipnet.conf" ]; then
-        echo -e "${RED}✗ Файл /etc/vipnet.conf не найден${NC}"
-        echo -e "${YELLOW}ViPNet не установлен в системе. Настройка DNS невозможна.${NC}"
-        return 1
-    fi
-    
-    # Создание резервной копии
-    echo -e "${BLUE}Создание резервной копии /etc/vipnet.conf...${NC}"
-    cp /etc/vipnet.conf /etc/vipnet.conf.backup.$(date +%Y%m%d_%H%M%S)
-    check_success "Создание резервной копии ViPNet конфигурации"
-    
-    # Замена DNS-серверов на корпоративные (департамент образования)
-    echo -e "${BLUE}Замена DNS-серверов на корпоративные (департамент образования)...${NC}"
-    echo -e "${YELLOW}Старые DNS: 77.88.8.88,77.88.8.2${NC}"
-    echo -e "${YELLOW}Новые DNS: 10.13.60.2,10.14.100.222${NC}"
-    
-    sed -i 's/77.88.8.88,77.88.8.2/10.13.60.2,10.14.100.222/' /etc/vipnet.conf
-    check_success "Замена DNS-серверов"
-    
-    # Включение параметра iptables=off
-    echo -e "${BLUE}Включение параметра iptables=off...${NC}"
-    
-    if grep -q ";iptables=off" /etc/vipnet.conf; then
-        sed -i 's/;iptables=off/iptables=off/' /etc/vipnet.conf
-        echo -e "${GREEN}✓ Параметр iptables=off раскомментирован${NC}"
-    elif grep -q "iptables=off" /etc/vipnet.conf; then
-        echo -e "${GREEN}✓ Параметр iptables=off уже активен${NC}"
-    else
-        echo "iptables=off" >> /etc/vipnet.conf
-        echo -e "${GREEN}✓ Параметр iptables=off добавлен в конфигурацию${NC}"
-    fi
-    check_success "Настройка параметра iptables"
-    
-    # Проверка конфигурации
-    echo -e "${BLUE}Проверка изменений в конфигурации...${NC}"
-    echo -e "${YELLOW}Текущие DNS в конфигурации:${NC}"
-    grep -E "^(;|)nameserver|dns" /etc/vipnet.conf | head -3
-    
-    echo -e "${YELLOW}Состояние параметра iptables:${NC}"
-    grep "iptables" /etc/vipnet.conf
-    
-    # Предложение перезапустить ViPNet
-    echo -e "${GREEN}✓ Настройка DNS для ViPNet завершена${NC}"
-    echo -e "${YELLOW}Для применения изменений рекомендуется перезапустить ViPNet:${NC}"
-    echo -e "${BLUE}  systemctl restart vipnet${NC}"
-    echo -e "${YELLOW}Или перезагрузить систему.${NC}"
-    
+    case $vipnet_choice in
+        1)
+            echo -e "${BLUE}Установка ViPNet Client...${NC}"
+            download_from_github "vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm" "$WORK_DIR"
+            if [ -f "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm" ]; then
+                dnf install -y "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+                check_success "Установка ViPNet Client"
+                rm -f "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+            else
+                echo -e "${RED}✗ Ошибка загрузки ViPNet Client${NC}"
+                return 1
+            fi
+            ;;
+        2)
+            echo -e "${BLUE}Установка ViPNet + Деловая почта...${NC}"
+            download_from_github "VipNet-DP.tar.gz" "$WORK_DIR"
+            if [ -f "$WORK_DIR/VipNet-DP.tar.gz" ]; then
+                cd "$WORK_DIR"
+                tar -xzf VipNet-DP.tar.gz
+                cd VipNet-DP
+                for rpm in *.rpm; do
+                    if [ -f "$rpm" ]; then
+                        dnf install -y "$rpm"
+                    fi
+                done
+                cd "$WORK_DIR"
+                rm -rf VipNet-DP
+                rm -f VipNet-DP.tar.gz
+                check_success "Установка ViPNet + Деловая почта"
+            else
+                echo -e "${RED}✗ Ошибка загрузки ViPNet-DP.tar.gz${NC}"
+                return 1
+            fi
+            ;;
+        *)
+            echo -e "${RED}Неверный выбор${NC}"
+            return 1
+            ;;
+    esac
     return 0
 }
 
-# Функция установки ViPNet
-install_vipnet() {
-    echo -e "${GREEN}=== Установка ViPNet ===${NC}"
-    
-    # Здесь будет логика установки ViPNet
-    # Например, установка из локального репозитория или скачивание
-    
-    echo -e "${BLUE}Поиск установочных файлов ViPNet...${NC}"
-    
-    # Проверяем наличие установочного файла
-    if [ -f "$WORK_DIR/vipnet_install.sh" ]; then
-        echo -e "${BLUE}Найден установочный файл ViPNet, запускаю установку...${NC}"
-        chmod +x "$WORK_DIR/vipnet_install.sh"
-        ./"$WORK_DIR/vipnet_install.sh"
-        check_success "Установка ViPNet"
-    else
-        echo -e "${YELLOW}Установочный файл ViPNet не найден в $WORK_DIR${NC}"
-        echo -e "${YELLOW}Пропускаем установку ViPNet${NC}"
-        return 1
+# Функция установки браузера Chromium-GOST
+install_chromium_gost() {
+    if confirm_installation "браузер Chromium-GOST (с поддержкой ГОСТ)"; then
+        download_from_github "chromium-gost-139.0.7258.139-linux-amd64.rpm" "$WORK_DIR"
+        if [ -f "$WORK_DIR/chromium-gost-139.0.7258.139-linux-amd64.rpm" ]; then
+            dnf install -y "$WORK_DIR/chromium-gost-139.0.7258.139-linux-amd64.rpm"
+            check_success "Установка Chromium-GOST"
+            rm -f "$WORK_DIR/chromium-gost-139.0.7258.139-linux-amd64.rpm"
+        fi
     fi
-    
-    return 0
 }
 
-# Функция проверки обновлений
-check_for_updates() {
-    local current_version="1.3"
-    local latest_version
-    
-    echo -e "${BLUE}Проверка обновлений...${NC}"
-    
-    latest_version=$(curl -s "https://api.github.com/repos/$GITHUB_USER/$GITHUB_REPO/releases/latest" 2>/dev/null | grep '"tag_name"' | head -n 1 | cut -d '"' -f 4 | sed 's/^v//')
-    
-    if [ -z "$latest_version" ]; then
-        echo -e "${YELLOW}Не удалось проверить обновления${NC}"
-        return 1
+# Функция установки мессенджеров
+install_messengers() {
+    # СРЕДА
+    if confirm_installation "корпоративный мессенджер СРЕДА"; then
+        download_from_github "sreda.rpm" "$WORK_DIR"
+        if [ -f "$WORK_DIR/sreda.rpm" ]; then
+            dnf install -y "$WORK_DIR/sreda.rpm"
+            check_success "Установка СРЕДА"
+            rm -f "$WORK_DIR/sreda.rpm"
+        fi
     fi
     
-    echo -e "${BLUE}Текущая версия: $current_version${NC}"
-    echo -e "${BLUE}Доступная версия: $latest_version${NC}"
+    # Viber
+    if confirm_installation "мессенджер Viber"; then
+        download_from_github "viber.rpm" "$WORK_DIR"
+        if [ -f "$WORK_DIR/viber.rpm" ]; then
+            dnf install -y "$WORK_DIR/viber.rpm"
+            check_success "Установка Viber"
+            rm -f "$WORK_DIR/viber.rpm"
+        fi
+    fi
     
-    if [ "$current_version" != "$latest_version" ]; then
-        echo -e "${YELLOW}Доступна новая версия!${NC}"
-        echo -e "${YELLOW}Хотите обновить скрипт? (y/n)${NC}"
-        read -r update_script
-        if [[ $update_script =~ ^[Yy]$ ]]; then
-            download_from_github "setup.sh" "/tmp" false
-            if [ $? -eq 0 ]; then
-                cp /tmp/setup.sh "$0"
-                chmod +x "$0"
-                echo -e "${GREEN}✓ Скрипт обновлен. Запустите его снова${NC}"
-                exit 0
+    # ВК Мессенджер
+    if confirm_installation "мессенджер ВК (VK Messenger)"; then
+        download_from_github "vk-messenger.rpm" "$WORK_DIR"
+        if [ -f "$WORK_DIR/vk-messenger.rpm" ]; then
+            dnf install -y "$WORK_DIR/vk-messenger.rpm"
+            check_success "Установка VK Messenger"
+            rm -f "$WORK_DIR/vk-messenger.rpm"
+        fi
+    fi
+    
+    # Telegram
+    if confirm_installation "мессенджер Telegram"; then
+        download_from_github "tsetup.tar.xz" "$WORK_DIR"
+        if [ -f "$WORK_DIR/tsetup.tar.xz" ]; then
+            cd "$WORK_DIR"
+            tar -xJf tsetup.tar.xz
+            mkdir -p /opt/telegram
+            cp -r Telegram/* /opt/telegram/
+            ln -sf /opt/telegram/Telegram /usr/bin/telegram
+            # Создание ярлыка
+            cat > /usr/share/applications/telegram.desktop << EOF
+[Desktop Entry]
+Name=Telegram
+Comment=Telegram Desktop
+Exec=/opt/telegram/Telegram
+Icon=/opt/telegram/telegram.png
+Terminal=false
+Type=Application
+Categories=Network;InstantMessaging;
+EOF
+            chmod +x /usr/share/applications/telegram.desktop
+            check_success "Установка Telegram"
+            rm -rf Telegram
+            rm -f tsetup.tar.xz
+        fi
+    fi
+}
+
+# Функция установки шрифтов Liberation
+install_liberation_fonts() {
+    if confirm_installation "шрифты Liberation"; then
+        download_from_github "Liberation.tar.gz" "$WORK_DIR"
+        if [ -f "$WORK_DIR/Liberation.tar.gz" ]; then
+            cd "$WORK_DIR"
+            tar -xzf Liberation.tar.gz
+            mkdir -p /usr/share/fonts/liberation
+            cp Liberation/* /usr/share/fonts/liberation/
+            fc-cache -fv
+            check_success "Установка шрифтов Liberation"
+            rm -rf Liberation
+            rm -f Liberation.tar.gz
+        fi
+    fi
+}
+
+# Функция установки Kaspersky Agent
+install_kaspersky() {
+    if confirm_installation "Kaspersky Agent"; then
+        download_from_github "kasp.tar.gz" "$WORK_DIR"
+        if [ -f "$WORK_DIR/kasp.tar.gz" ]; then
+            cd "$WORK_DIR"
+            tar -xzf kasp.tar.gz
+            for script in *.sh; do
+                if [ -f "$script" ]; then
+                    chmod +x "$script"
+                    ./"$script"
+                fi
+            done
+            check_success "Установка Kaspersky Agent"
+            rm -f kasp.tar.gz
+            rm -f *.sh
+        fi
+    fi
+}
+
+# Функция установки КриптоПро
+install_cryptopro() {
+    if confirm_installation "КриптоПро и дополнительные пакеты"; then
+        echo -e "${GREEN}Установка КриптоПро...${NC}"
+        
+        dnf install -y ifd-rutokens token-manager gostcryptogui caja-gostcryptogui
+        check_success "Установка пакетов для КриптоПро"
+        
+        download_from_github "kriptopror4.tar.gz" "$WORK_DIR"
+        if [ -f "$WORK_DIR/kriptopror4.tar.gz" ]; then
+            cd "$WORK_DIR"
+            tar -xzf kriptopror4.tar.gz
+            cd R4
+            if [ -f "install_gui.sh" ]; then
+                chmod +x install_gui.sh
+                ./install_gui.sh
+                check_success "Установка КриптоПро"
+            fi
+            cd "$WORK_DIR"
+            rm -rf R4
+            rm -f kriptopror4.tar.gz
+        fi
+    else
+        echo -e "${YELLOW}Пропускаем установку КриптоПро${NC}"
+    fi
+}
+
+# Функция установки 1С
+install_1c() {
+    if confirm_installation "1С:Предприятие"; then
+        echo -e "${GREEN}Устанавливаю 1С...${NC}"
+        
+        download_from_github "1c.tar.gz" "$WORK_DIR"
+        if [ -f "$WORK_DIR/1c.tar.gz" ]; then
+            cd "$WORK_DIR"
+            tar -xzf 1c.tar.gz
+            rm -f 1c.tar.gz
+            
+            if [ -d "lin_8_3_24_1691" ]; then
+                cd lin_8_3_24_1691
+                chmod +x setup-full-8.3.24.1691-x86_64.run fix.sh
+                ./setup-full-8.3.24.1691-x86_64.run
+                ./fix.sh
+                cd ..
+                rm -rf lin_8_3_24_1691
+                echo -e "${GREEN}✓ 1С успешно установлена${NC}"
             fi
         fi
+    else
+        echo -e "${YELLOW}Пропускаем установку 1С${NC}"
     fi
 }
 
@@ -274,9 +308,6 @@ echo -e "${GREEN}=== Начало настройки РЕД ОС 7.3 ===${NC}"
 echo -e "${BLUE}Дата запуска: $(date)${NC}"
 echo -e "${BLUE}GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO${NC}"
 echo ""
-
-# Проверка обновлений
-check_for_updates
 
 # Отключаем SELinux
 sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
@@ -296,246 +327,45 @@ cd "$WORK_DIR" || exit 1
 check_success "Создание рабочей директории"
 
 # Проверка наличия необходимых команд
-check_command "smbclient"
 check_command "wget"
 check_command "curl"
-check_command "numfmt"
 
-# Выбор источника загрузки
-echo -e "${GREEN}=== Выбор источника загрузки ===${NC}"
-echo "1. GitHub (из интернета) - рекомендуется"
-echo "2. Локальная сеть (SMB)"
-echo -e "${YELLOW}Выберите источник (1 или 2):${NC}"
-read -r source_choice
+# === ОПРОС ПОЛЬЗОВАТЕЛЯ ===
+echo -e "${GREEN}=== Выбор программ для установки ===${NC}"
+echo -e "${YELLOW}Будут загружены только те программы, на которые вы дадите согласие${NC}"
+echo ""
 
-# Скачивание основного пакета
-case $source_choice in
-    1)
-        echo -e "${GREEN}Использую GitHub репозиторий${NC}"
-        
-        if ! download_from_github "pack.tar.gz" "$WORK_DIR"; then
-            echo -e "${RED}Не удалось загрузить pack.tar.gz из GitHub${NC}"
-            echo -e "${YELLOW}Попробовать загрузить из локальной сети? (y/n)${NC}"
-            read -r try_smb
-            if [[ $try_smb =~ ^[Yy]$ ]]; then
-                echo -e "${YELLOW}Введи пароль админа для скачивания пакетов:${NC}"
-                if ! download_from_smb "10.13.60.3" "soft" "MKUUO.LBT.RF/admin" "RedOS/pack.tar.gz" "$WORK_DIR/pack.tar.gz"; then
-                    exit 1
-                fi
-            else
-                exit 1
-            fi
-        fi
-        ;;
-    2)
-        echo -e "${GREEN}Использую локальную сеть${NC}"
-        echo -e "${YELLOW}Введи пароль админа для скачивания пакетов:${NC}"
-        if ! download_from_smb "10.13.60.3" "soft" "MKUUO.LBT.RF/admin" "RedOS/pack.tar.gz" "$WORK_DIR/pack.tar.gz"; then
-            exit 1
-        fi
-        ;;
-    *)
-        echo -e "${RED}Неверный выбор${NC}"
-        exit 1
-        ;;
-esac
+# 1. Базовые компоненты (устанавливаются всегда)
+echo -e "${BLUE}--- Базовые компоненты (устанавливаются всегда) ---${NC}"
 
-# Распаковка с прогрессом
-if [ -f "pack.tar.gz" ]; then
-    echo -e "${BLUE}Распаковка архива...${NC}"
-    
-    if command -v pv &> /dev/null; then
-        pv pack.tar.gz | tar -xzf -
-    else
-        tar -xzf pack.tar.gz &
-        local tar_pid=$!
-        show_progress $tar_pid
-        wait $tar_pid
-    fi
-    
-    rm -f pack.tar.gz
-    check_success "Распаковка архива"
-fi
+# 2. Шрифты
+install_liberation_fonts
 
-# Обновление системы
-echo -e "${GREEN}Обновление системы...${NC}"
-dnf clean all
-dnf makecache
-dnf update -y
-check_success "Обновление системы"
+# 3. Браузеры
+install_chromium_gost
 
-# === БЛОК УСТАНОВКИ РЕПОЗИТОРИЕВ ===
-echo -e "${GREEN}Установка репозиториев...${NC}"
+# 4. Мессенджеры
+install_messengers
 
-dnf install -y r7-release
-check_success "Установка репозитория r7"
+# 5. Kaspersky Agent
+install_kaspersky
 
-dnf install -y yandex-browser-release
-check_success "Установка репозитория Яндекс Браузера"
+# 6. КриптоПро
+install_cryptopro
 
-cat > /etc/yum.repos.d/max.repo << 'EOF'
-[max]
-name=MAX Desktop
-baseurl=https://download.max.ru/linux/rpm/el/9/x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://download.max.ru/linux/rpm/public.asc
-sslverify=1
-metadata_expire=300
-EOF
-
-rpm --import https://download.max.ru/linux/rpm/public.asc
-check_success "Установка репозитория MAX"
-
-dnf makecache
-check_success "Обновление кэша репозиториев"
-
-# === УСТАНОВКА ЯДРА ===
-echo -e "${BLUE}Установка ядра...${NC}"
-dnf install -y redos-kernels6-release
-check_success "Установка ядра redos-kernels6"
-
-# Финальное обновление
-dnf update -y
-check_success "Финальное обновление"
-
-# === УСТАНОВКА ОСНОВНЫХ ПАКЕТОВ ===
-PACKAGES="pavucontrol r7-office yandex-browser-stable sshfs pinta perl-Getopt-Long perl-File-Copy"
-dnf install -y $PACKAGES
-check_success "Установка основных пакетов"
-
-# Установка MAX
-dnf install -y max
-check_success "Установка MAX"
-
-# Установка локальных RPM
-if ls *.rpm 1> /dev/null 2>&1; then
-    dnf install -y *.rpm
-    check_success "Установка локальных RPM"
-fi
-
-# === УСТАНОВКА VIPNET ===
+# 7. ViPNet (с выбором версии)
 if confirm_installation "ViPNet"; then
-    install_vipnet
+    select_vipnet_version
 else
     echo -e "${YELLOW}Пропускаем установку ViPNet${NC}"
 fi
 
-# === НАСТРОЙКА DNS ДЛЯ VIPNET (ТОЛЬКО ДЛЯ ДЕПАРТАМЕНТА ОБРАЗОВАНИЯ) ===
-echo -e "${GREEN}=== Настройка DNS для ViPNet ===${NC}"
-echo -e "${YELLOW}Внимание! Замена DNS на корпоративные (10.13.60.2, 10.14.100.222)${NC}"
-echo -e "${YELLOW}необходима ТОЛЬКО для работы в локальной сети департамента образования.${NC}"
-echo -e "${YELLOW}Если вы работаете в другой сети или через интернет, оставьте DNS без изменений.${NC}"
-echo -e "${YELLOW}Заменить DNS на корпоративные? (y/n)${NC}"
-read -r configure_dns
-
-if [[ $configure_dns =~ ^[Yy]$ ]]; then
-    setup_vipnet_dns
-else
-    echo -e "${YELLOW}Пропускаем настройку DNS. DNS-серверы остаются без изменений.${NC}"
-fi
-
-# === УСТАНОВКА КРИПТОПРО И ДОПОЛНИТЕЛЬНЫХ ПАКЕТОВ ===
-if confirm_installation "КриптоПро и дополнительные пакеты"; then
-    echo -e "${GREEN}Установка КриптоПро и дополнительных пакетов...${NC}"
-    
-    dnf install -y ifd-rutokens
-    check_success "Установка ifd-rutokens"
-    
-    dnf install -y token-manager
-    check_success "Установка token-manager"
-    
-    dnf install -y gostcryptogui caja-gostcryptogui
-    check_success "Установка gostcryptogui и caja-gostcryptogui"
-    
-    if [ -f "$WORK_DIR/R4/install_gui.sh" ]; then
-        chmod +x "$WORK_DIR/R4/install_gui.sh"
-        cd "$WORK_DIR/R4"
-        ./install_gui.sh
-        cd "$WORK_DIR"
-        check_success "Установка КриптоПро"
-    else
-        echo -e "${YELLOW}Предупреждение: Файл install_gui.sh не найден${NC}"
-    fi
-else
-    echo -e "${YELLOW}Пропускаем установку КриптоПро${NC}"
-fi
-
-# === УСТАНОВКА KASPERSKY AGENT ===
-if confirm_installation "Kaspersky Agent"; then
-    if [ -f "klnagent64-15.4.0-8952.x86_64.sh" ]; then
-        chmod +x klnagent64-15.4.0-8952.x86_64.sh
-        ./klnagent64-15.4.0-8952.x86_64.sh
-        check_success "Установка Kaspersky Agent"
-    else
-        echo -e "${RED}✗ Файл klnagent64-15.4.0-8952.x86_64.sh не найден${NC}"
-    fi
-else
-    echo -e "${YELLOW}Пропускаем установку Kaspersky Agent${NC}"
-fi
-
-# Очистка RPM пакетов
-rm -f "$WORK_DIR"/*.rpm
-check_success "Очистка временных файлов"
-
-# Включение TRIM для SSD
-systemctl enable --now fstrim.timer
-check_success "Настройка TRIM"
-
-# Обновление GRUB
-grub2-mkconfig -o /boot/grub2/grub.cfg
-check_success "Обновление GRUB"
-
-# Установка 1С
-if confirm_installation "1С"; then
-    echo -e "${GREEN}Устанавливаю 1С...${NC}"
-    
-    case $source_choice in
-        1)
-            download_from_github "1c.tar.gz" "$WORK_DIR"
-            ;;
-        2)
-            echo -e "${YELLOW}Введи пароль админа:${NC}"
-            download_from_smb "10.13.60.3" "soft" "MKUUO.LBT.RF/admin" "RedOS/1c.tar.gz" "$WORK_DIR/1c.tar.gz"
-            ;;
-    esac
-    
-    if [ -f "1c.tar.gz" ]; then
-        echo -e "${BLUE}Распаковка 1c.tar.gz...${NC}"
-        tar -xzf 1c.tar.gz
-        rm -f 1c.tar.gz
-        
-        if [ -d "lin_8_3_24_1691" ]; then
-            cd lin_8_3_24_1691
-            chmod +x setup-full-8.3.24.1691-x86_64.run fix.sh
-            ./setup-full-8.3.24.1691-x86_64.run
-            ./fix.sh
-            cd ..
-            rm -rf lin_8_3_24_1691
-            echo -e "${GREEN}✓ 1С успешно установлена${NC}"
-        fi
-    fi
-else
-    echo -e "${YELLOW}Пропускаем установку 1С${NC}"
-fi
-
-# Настройка для моноблока KSG
-if confirm_installation "настройку для моноблока KSG"; then
-    if [ -f "/etc/gdm/Init/Default" ]; then
-        insert_before_exit "/etc/gdm/Init/Default" "xrandr --output HDMI-3 --primary"
-        echo -e "${GREEN}✓ Настройка KSG выполнена${NC}"
-    else
-        echo -e "${RED}✗ Файл /etc/gdm/Init/Default не найден${NC}"
-    fi
-else
-    echo -e "${YELLOW}Пропускаем настройку KSG${NC}"
-fi
+# 8. 1С
+install_1c
 
 # === ЗАВЕРШЕНИЕ ===
 echo -e "${GREEN}=== Настройка завершена! ===${NC}"
 echo -e "${BLUE}Время завершения: $(date)${NC}"
-echo -e "${BLUE}GitHub репозиторий: https://github.com/$GITHUB_USER/$GITHUB_REPO${NC}"
 echo -e "${YELLOW}Рекомендуется перезагрузить систему. Перезагрузить сейчас? (y/n)${NC}"
 read -r reboot_now
 if [[ $reboot_now =~ ^[Yy]$ ]]; then
