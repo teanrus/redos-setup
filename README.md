@@ -174,7 +174,7 @@ Copyright (c) 2025 teanrus
 Разрешается бесплатное использование, копирование, изменение и распространение данного программного обеспечения.
 
 ### 🤝 Поддержка и обратная связь
-- [E-mail](tyanrv@lbt.yanao.ru)
+- [E-mail](mailto:tyanrv@lbt.yanao.ru)
 - Релизы: https://github.com/teanrus/redos-setup/releases
 - Исходный код: https://github.com/teanrus/redos-setup
 
