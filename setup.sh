@@ -1,7 +1,7 @@
 #!/bin/bash
 # Автоматизированная настройка РЕД ОС 7.3
 # GitHub: https://github.com/teanrus/redos-setup
-# Версия: 2.1
+# Версия: 2.2
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -13,9 +13,18 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
-GITHUB_TAG="v1.0"
+GITHUB_TAG="v2.2"  # Исправлено: версия соответствует скрипту
 
 # === ФУНКЦИИ ===
+
+# Функция для безопасного чтения ввода (работает даже при curl | bash)
+safe_read() {
+    local prompt="$1"
+    local answer
+    echo -e "$prompt" > /dev/tty
+    read -r answer < /dev/tty
+    echo "$answer"
+}
 
 # Функция для проверки успешности выполнения команд
 check_success() {
@@ -42,7 +51,7 @@ show_progress() {
     local delay=0.1
     local spinstr='|/-\'
     echo -n " "
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+    while kill -0 "$pid" 2>/dev/null; do
         local temp=${spinstr#?}
         printf " [%c]  " "$spinstr"
         local spinstr=$temp${spinstr%"$temp"}
@@ -61,6 +70,12 @@ download_from_github() {
     
     echo -e "${BLUE}Загрузка $file_name...${NC}"
     
+    # Проверяем доступность файла
+    if ! curl -s --head -f "$url" > /dev/null 2>&1; then
+        echo -e "${RED}✗ Файл $file_name не найден в релизе $GITHUB_TAG${NC}"
+        return 1
+    fi
+    
     if wget --progress=bar:force -O "$dest_dir/$file_name" "$url" 2>&1; then
         echo -e "${GREEN}✓ $file_name успешно загружен${NC}"
         return 0
@@ -70,13 +85,13 @@ download_from_github() {
     fi
 }
 
-# Функция для запроса подтверждения
+# Функция для запроса подтверждения (с безопасным чтением)
 confirm_installation() {
     local component_name=$1
     local answer
     
-    echo -e "${YELLOW}Установить $component_name? (y/n)${NC}"
-    read -r answer
+    echo -e "${YELLOW}Установить $component_name? (y/n)${NC}" > /dev/tty
+    read -r answer < /dev/tty
     if [[ $answer =~ ^[Yy]$ ]]; then
         return 0
     else
@@ -86,11 +101,11 @@ confirm_installation() {
 
 # Функция выбора версии ViPNet
 select_vipnet_version() {
-    echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}"
-    echo "1. ViPNet Client (без деловой почты)"
-    echo "2. ViPNet + Деловая почта (DP)"
-    echo -e "${YELLOW}Выберите вариант (1 или 2):${NC}"
-    read -r vipnet_choice
+    echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}" > /dev/tty
+    echo "1. ViPNet Client (без деловой почты)" > /dev/tty
+    echo "2. ViPNet + Деловая почта (DP)" > /dev/tty
+    echo -e "${YELLOW}Выберите вариант (1 или 2):${NC}" > /dev/tty
+    read -r vipnet_choice < /dev/tty
     
     case $vipnet_choice in
         1)
@@ -187,8 +202,7 @@ install_messengers() {
             mkdir -p /opt/telegram
             cp -r Telegram/* /opt/telegram/
             ln -sf /opt/telegram/Telegram /usr/bin/telegram
-            # Создание ярлыка
-            cat > /usr/share/applications/telegram.desktop << EOF
+            cat > /usr/share/applications/telegram.desktop << 'EOF'
 [Desktop Entry]
 Name=Telegram
 Comment=Telegram Desktop
@@ -304,17 +318,24 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+# Перенаправляем весь ввод/вывод для интерактивности
+exec < /dev/tty > /dev/tty 2>&1
+
 echo -e "${GREEN}=== Начало настройки РЕД ОС 7.3 ===${NC}"
 echo -e "${BLUE}Дата запуска: $(date)${NC}"
 echo -e "${BLUE}GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO${NC}"
 echo ""
 
 # Отключаем SELinux
-sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
-check_success "Отключение SELinux"
+if [ -f /etc/selinux/config ]; then
+    sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+    check_success "Отключение SELinux"
+else
+    echo -e "${YELLOW}Файл /etc/selinux/config не найден, SELinux не настраивается${NC}"
+fi
 
 # Настройка DNF
-if ! grep -q "max_parallel_downloads" /etc/dnf/dnf.conf; then
+if ! grep -q "max_parallel_downloads" /etc/dnf/dnf.conf 2>/dev/null; then
     echo "max_parallel_downloads=10" >> /etc/dnf/dnf.conf
     check_success "Настройка DNF"
 fi
@@ -335,40 +356,69 @@ echo -e "${GREEN}=== Выбор программ для установки ===${
 echo -e "${YELLOW}Будут загружены только те программы, на которые вы дадите согласие${NC}"
 echo ""
 
-# 1. Базовые компоненты (устанавливаются всегда)
-echo -e "${BLUE}--- Базовые компоненты (устанавливаются всегда) ---${NC}"
-
-# 2. Шрифты
+# Шрифты
 install_liberation_fonts
 
-# 3. Браузеры
+# Браузеры
 install_chromium_gost
 
-# 4. Мессенджеры
+# Мессенджеры
 install_messengers
 
-# 5. Kaspersky Agent
+# Kaspersky Agent
 install_kaspersky
 
-# 6. КриптоПро
+# КриптоПро
 install_cryptopro
 
-# 7. ViPNet (с выбором версии)
+# ViPNet (с выбором версии)
 if confirm_installation "ViPNet"; then
     select_vipnet_version
 else
     echo -e "${YELLOW}Пропускаем установку ViPNet${NC}"
 fi
 
-# 8. 1С
+# 1С
 install_1c
 
 # === ЗАВЕРШЕНИЕ ===
 echo -e "${GREEN}=== Настройка завершена! ===${NC}"
 echo -e "${BLUE}Время завершения: $(date)${NC}"
-echo -e "${YELLOW}Рекомендуется перезагрузить систему. Перезагрузить сейчас? (y/n)${NC}"
-read -r reboot_now
+echo ""
+
+# Вывод списка установленных программ
+echo -e "${GREEN}Установленные компоненты:${NC}"
+command -v chromium-gost >/dev/null 2>&1 && echo "  ✓ Chromium-GOST"
+command -v sreda >/dev/null 2>&1 && echo "  ✓ СРЕДА"
+command -v viber >/dev/null 2>&1 && echo "  ✓ Viber"
+command -v vk-messenger >/dev/null 2>&1 && echo "  ✓ VK Messenger"
+command -v telegram >/dev/null 2>&1 && echo "  ✓ Telegram"
+[ -d /usr/share/fonts/liberation ] && echo "  ✓ Шрифты Liberation"
+[ -f /opt/kaspersky/agent ] 2>/dev/null && echo "  ✓ Kaspersky Agent"
+[ -f /opt/cprocsp ] 2>/dev/null && echo "  ✓ КриптоПро"
+[ -f /etc/vipnet.conf ] && echo "  ✓ ViPNet"
+[ -d /opt/1cv8 ] 2>/dev/null && echo "  ✓ 1С:Предприятие"
+
+echo ""
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${YELLOW}  ВНИМАНИЕ! Для корректной работы некоторых программ${NC}"
+echo -e "${YELLOW}  (ViPNet, КриптоПро, 1С) рекомендуется перезагрузить систему.${NC}"
+echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
+echo ""
+
+# Запрос на перезагрузку с таймаутом
+echo -e "${YELLOW}Перезагрузить систему сейчас? (y/n) - по умолчанию n через 30 секунд${NC}" > /dev/tty
+read -t 30 -r reboot_now < /dev/tty || reboot_now="n"
+echo ""
+
 if [[ $reboot_now =~ ^[Yy]$ ]]; then
+    echo -e "${BLUE}Система будет перезагружена через 5 секунд. Нажмите Ctrl+C для отмены...${NC}"
+    sleep 5
     echo -e "${BLUE}Перезагрузка...${NC}"
+    sync
+    sleep 2
     reboot
+else
+    echo -e "${GREEN}Перезагрузка отменена. Вы можете перезагрузить систему позже командой:${NC}"
+    echo -e "${BLUE}  sudo reboot${NC}"
 fi
