@@ -1,7 +1,7 @@
 #!/bin/bash
 # Автоматизированная настройка РЕД ОС 7.3
 # GitHub: https://github.com/teanrus/redos-setup
-# Версия: 2.4
+# Версия: 2.7
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -13,7 +13,7 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
-GITHUB_TAG="v2.4"
+GITHUB_TAG="v2.7"
 
 # === ФУНКЦИИ ===
 
@@ -21,10 +21,51 @@ GITHUB_TAG="v2.4"
 read_from_terminal() {
     local prompt="$1"
     local answer
-    # Открываем /dev/tty для чтения ввода
     echo -e "$prompt" >&2
     read -r answer < /dev/tty 2>/dev/null || true
     echo "$answer"
+}
+
+# Функция для проверки успешности выполнения команд
+check_success() {
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ $1 успешно выполнено${NC}"
+    else
+        echo -e "${RED}✗ Ошибка при выполнении: $1${NC}"
+        exit 1
+    fi
+}
+
+# Функция для проверки наличия команды
+check_command() {
+    if ! command -v $1 &> /dev/null; then
+        echo -e "${YELLOW}Устанавливаю $1...${NC}"
+        dnf install -y $1
+        check_success "Установка $1"
+    fi
+}
+
+# Функция скачивания с GitHub
+download_from_github() {
+    local file_name=$1
+    local dest_dir=$2
+    
+    local url="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$GITHUB_TAG/$file_name"
+    
+    echo -e "${BLUE}Загрузка $file_name...${NC}"
+    
+    if ! curl -s --head -f "$url" > /dev/null 2>&1; then
+        echo -e "${RED}✗ Файл $file_name не найден в релизе $GITHUB_TAG${NC}"
+        return 1
+    fi
+    
+    if wget --progress=bar:force -O "$dest_dir/$file_name" "$url" 2>&1; then
+        echo -e "${GREEN}✓ $file_name успешно загружен${NC}"
+        return 0
+    else
+        echo -e "${RED}✗ Ошибка загрузки $file_name${NC}"
+        return 1
+    fi
 }
 
 # Функция для запроса подтверждения
@@ -37,6 +78,149 @@ confirm_installation() {
         return 0
     else
         return 1
+    fi
+}
+
+# Функция для вставки строки перед exit 0
+insert_before_exit() {
+    local file=$1
+    local line=$2
+    
+    if [ -f "$file" ]; then
+        local temp_file=$(mktemp)
+        
+        while IFS= read -r file_line; do
+            if [[ "$file_line" =~ ^[[:space:]]*exit[[:space:]]+0 ]]; then
+                echo "$line" >> "$temp_file"
+            fi
+            echo "$file_line" >> "$temp_file"
+        done < "$file"
+        
+        mv "$temp_file" "$file"
+        chmod --reference="$file" "$file" 2>/dev/null || chmod 755 "$file"
+        
+        echo -e "${GREEN}✓ Строка добавлена перед exit 0 в $file${NC}"
+    else
+        echo -e "${RED}✗ Файл $file не найден${NC}"
+        return 1
+    fi
+}
+
+# Функция установки базовых репозиториев и системных пакетов
+install_base_system() {
+    echo -e "${GREEN}=== Установка базовых репозиториев и системных пакетов ===${NC}"
+    
+    # Обновление системы
+    echo -e "${BLUE}Обновление системы...${NC}"
+    dnf clean all
+    dnf makecache
+    dnf update -y
+    check_success "Обновление системы"
+    
+    # Установка репозиториев
+    echo -e "${BLUE}Установка репозиториев...${NC}"
+    dnf install -y r7-release
+    check_success "Установка репозитория r7"
+    
+    dnf install -y yandex-browser-release
+    check_success "Установка репозитория Яндекс Браузера"
+    
+    # Установка MAX репозитория
+    cat > /etc/yum.repos.d/max.repo << 'EOF'
+[max]
+name=MAX Desktop
+baseurl=https://download.max.ru/linux/rpm/el/9/x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://download.max.ru/linux/rpm/public.asc
+sslverify=1
+metadata_expire=300
+EOF
+    
+    rpm --import https://download.max.ru/linux/rpm/public.asc
+    check_success "Установка репозитория MAX"
+    
+    # Обновление кэша
+    dnf makecache
+    check_success "Обновление кэша репозиториев"
+    
+    # Установка ядра
+    echo -e "${BLUE}Установка ядра...${NC}"
+    dnf install -y redos-kernels6-release
+    check_success "Установка ядра redos-kernels6"
+    
+    # Финальное обновление
+    dnf update -y
+    check_success "Финальное обновление"
+    
+    # Установка основных пакетов
+    echo -e "${BLUE}Установка основных пакетов...${NC}"
+    local base_packages="pavucontrol r7-office yandex-browser-stable sshfs pinta perl-Getopt-Long perl-File-Copy"
+    dnf install -y $base_packages
+    check_success "Установка основных пакетов"
+    
+    # Установка MAX
+    dnf install -y max
+    check_success "Установка MAX"
+}
+
+# Функция установки шрифтов Liberation (обновленная для .zip)
+install_liberation_fonts() {
+    if confirm_installation "шрифты Liberation"; then
+        # Проверяем наличие unzip
+        if ! command -v unzip &> /dev/null; then
+            echo -e "${BLUE}Устанавливаю unzip...${NC}"
+            dnf install -y unzip
+            check_success "Установка unzip"
+        fi
+        
+        # Пробуем скачать .zip (новый формат)
+        if download_from_github "Liberation.zip" "$WORK_DIR"; then
+            if [ -f "$WORK_DIR/Liberation.zip" ]; then
+                cd "$WORK_DIR"
+                
+                # Создаем директорию для шрифтов
+                mkdir -p /usr/share/fonts/liberation
+                
+                # Распаковываем архив
+                echo -e "${BLUE}Распаковка Liberation.zip...${NC}"
+                unzip -o Liberation.zip -d /usr/share/fonts/liberation/
+                check_success "Распаковка архива Liberation.zip"
+                rm -f Liberation.zip
+                
+                # Устанавливаем правильные права
+                chmod 644 /usr/share/fonts/liberation/* 2>/dev/null
+                
+                # Обновляем кэш шрифтов
+                echo -e "${BLUE}Обновление кэша шрифтов...${NC}"
+                fc-cache -fv
+                
+                # Проверяем установку
+                if fc-list | grep -i liberation > /dev/null; then
+                    echo -e "${GREEN}✓ Шрифты Liberation успешно установлены${NC}"
+                else
+                    echo -e "${YELLOW}Шрифты установлены, но не обнаружены в кэше. Возможно, требуется перезагрузка.${NC}"
+                fi
+                
+                check_success "Установка шрифтов Liberation"
+            fi
+        # Если .zip не найден, пробуем старый формат .tar.gz (обратная совместимость)
+        elif download_from_github "Liberation.tar.gz" "$WORK_DIR"; then
+            if [ -f "$WORK_DIR/Liberation.tar.gz" ]; then
+                cd "$WORK_DIR"
+                mkdir -p /usr/share/fonts/liberation
+                tar -xzf Liberation.tar.gz
+                cp Liberation/* /usr/share/fonts/liberation/
+                rm -rf Liberation
+                rm -f Liberation.tar.gz
+                chmod 644 /usr/share/fonts/liberation/* 2>/dev/null
+                fc-cache -fv
+                check_success "Установка шрифтов Liberation (старый формат)"
+            fi
+        else
+            echo -e "${RED}✗ Файл со шрифтами Liberation не найден в релизе${NC}"
+        fi
     fi
 }
 
@@ -87,48 +271,6 @@ select_vipnet_version() {
             ;;
     esac
     return 0
-}
-
-# Функция для проверки успешности выполнения команд
-check_success() {
-    if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ $1 успешно выполнено${NC}"
-    else
-        echo -e "${RED}✗ Ошибка при выполнении: $1${NC}"
-        exit 1
-    fi
-}
-
-# Функция для проверки наличия команды
-check_command() {
-    if ! command -v $1 &> /dev/null; then
-        echo -e "${YELLOW}Устанавливаю $1...${NC}"
-        dnf install -y $1
-        check_success "Установка $1"
-    fi
-}
-
-# Функция скачивания с GitHub
-download_from_github() {
-    local file_name=$1
-    local dest_dir=$2
-    
-    local url="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$GITHUB_TAG/$file_name"
-    
-    echo -e "${BLUE}Загрузка $file_name...${NC}"
-    
-    if ! curl -s --head -f "$url" > /dev/null 2>&1; then
-        echo -e "${RED}✗ Файл $file_name не найден в релизе $GITHUB_TAG${NC}"
-        return 1
-    fi
-    
-    if wget --progress=bar:force -O "$dest_dir/$file_name" "$url" 2>&1; then
-        echo -e "${GREEN}✓ $file_name успешно загружен${NC}"
-        return 0
-    else
-        echo -e "${RED}✗ Ошибка загрузки $file_name${NC}"
-        return 1
-    fi
 }
 
 # Функция установки браузера Chromium-GOST
@@ -198,23 +340,6 @@ EOF
             check_success "Установка Telegram"
             rm -rf Telegram
             rm -f tsetup.tar.xz
-        fi
-    fi
-}
-
-# Функция установки шрифтов Liberation
-install_liberation_fonts() {
-    if confirm_installation "шрифты Liberation"; then
-        download_from_github "Liberation.tar.gz" "$WORK_DIR"
-        if [ -f "$WORK_DIR/Liberation.tar.gz" ]; then
-            cd "$WORK_DIR"
-            tar -xzf Liberation.tar.gz
-            mkdir -p /usr/share/fonts/liberation
-            cp Liberation/* /usr/share/fonts/liberation/
-            fc-cache -fv
-            check_success "Установка шрифтов Liberation"
-            rm -rf Liberation
-            rm -f Liberation.tar.gz
         fi
     fi
 }
@@ -292,6 +417,43 @@ install_1c() {
     fi
 }
 
+# Функция настройки TRIM для SSD
+setup_trim() {
+    if confirm_installation "настройку TRIM для SSD"; then
+        echo -e "${BLUE}Настройка TRIM для SSD...${NC}"
+        systemctl enable --now fstrim.timer
+        check_success "Настройка TRIM"
+    else
+        echo -e "${YELLOW}Пропускаем настройку TRIM${NC}"
+    fi
+}
+
+# Функция обновления GRUB
+update_grub() {
+    if confirm_installation "обновление конфигурации GRUB"; then
+        echo -e "${BLUE}Обновление GRUB...${NC}"
+        grub2-mkconfig -o /boot/grub2/grub.cfg
+        check_success "Обновление GRUB"
+    else
+        echo -e "${YELLOW}Пропускаем обновление GRUB${NC}"
+    fi
+}
+
+# Функция настройки моноблока KSG
+setup_ksg() {
+    if confirm_installation "настройку для моноблока KSG"; then
+        echo -e "${BLUE}Настройка моноблока KSG...${NC}"
+        if [ -f "/etc/gdm/Init/Default" ]; then
+            insert_before_exit "/etc/gdm/Init/Default" "xrandr --output HDMI-3 --primary"
+            echo -e "${GREEN}✓ Настройка KSG выполнена (команда добавлена перед exit 0)${NC}"
+        else
+            echo -e "${RED}✗ Файл /etc/gdm/Init/Default не найден${NC}"
+        fi
+    else
+        echo -e "${YELLOW}Пропускаем настройку KSG${NC}"
+    fi
+}
+
 # === НАЧАЛО СКРИПТА ===
 
 # Проверка прав root
@@ -315,8 +477,6 @@ echo ""
 if [ -f /etc/selinux/config ]; then
     sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
     check_success "Отключение SELinux"
-else
-    echo -e "${YELLOW}Файл /etc/selinux/config не найден, SELinux не настраивается${NC}"
 fi
 
 # Настройка DNF
@@ -336,8 +496,15 @@ check_success "Создание рабочей директории"
 check_command "wget"
 check_command "curl"
 
-# === ОПРОС ПОЛЬЗОВАТЕЛЯ ===
-echo -e "${GREEN}=== Выбор программ для установки ===${NC}"
+# === УСТАНОВКА БАЗОВОЙ СИСТЕМЫ ===
+if confirm_installation "базовую систему (репозитории, ядро, r7-office, Яндекс.Браузер, MAX, системные утилиты)"; then
+    install_base_system
+else
+    echo -e "${YELLOW}Пропускаем установку базовой системы${NC}"
+fi
+
+# === ВЫБОР ДОПОЛНИТЕЛЬНЫХ ПРОГРАММ ===
+echo -e "${GREEN}=== Выбор дополнительных программ для установки ===${NC}"
 echo -e "${YELLOW}Будут загружены только те программы, на которые вы дадите согласие${NC}"
 echo ""
 
@@ -366,6 +533,18 @@ fi
 # 1С
 install_1c
 
+# === СИСТЕМНЫЕ НАСТРОЙКИ ===
+echo -e "${GREEN}=== Системные настройки ===${NC}"
+
+# Настройка TRIM
+setup_trim
+
+# Обновление GRUB
+update_grub
+
+# Настройка для моноблока KSG
+setup_ksg
+
 # === ЗАВЕРШЕНИЕ ===
 echo -e "${GREEN}=== Настройка завершена! ===${NC}"
 echo -e "${BLUE}Время завершения: $(date)${NC}"
@@ -383,6 +562,11 @@ command -v telegram >/dev/null 2>&1 && echo "  ✓ Telegram"
 [ -d /opt/cprocsp ] 2>/dev/null && echo "  ✓ КриптоПро"
 [ -f /etc/vipnet.conf ] && echo "  ✓ ViPNet"
 [ -d /opt/1cv8 ] 2>/dev/null && echo "  ✓ 1С:Предприятие"
+command -v r7-office >/dev/null 2>&1 && echo "  ✓ R7 Office"
+command -v yandex-browser >/dev/null 2>&1 && echo "  ✓ Яндекс.Браузер"
+command -v pavucontrol >/dev/null 2>&1 && echo "  ✓ Pavucontrol (звук)"
+command -v sshfs >/dev/null 2>&1 && echo "  ✓ SSHFS"
+command -v pinta >/dev/null 2>&1 && echo "  ✓ Pinta"
 
 echo ""
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
