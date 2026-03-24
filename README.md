@@ -234,37 +234,46 @@ ViPNet
 
 ### 🐛 Устранение неполадок
 Проблема: "Permission denied"
+
 Решение: Запустите скрипт с правами root:
 
 ```bash
 sudo ./setup.sh
 ```
 Проблема: Не удается скачать файл
+
 Решение: Проверьте интернет-соединение и доступность GitHub:
+
 ```bash
 curl -I https://github.com/teanrus/redos-setup/releases/download/v1.0/setup.sh
 ```
 Проблема: Ошибка при установке RPM
+
 Решение: Убедитесь, что система обновлена:
+
 ```bash
 dnf update -y
 ```
 
 Проблема: Нет доступа к GitHub
+
 Решение: Используйте локальный источник или настройте прокси:
+
 ```bash
 export http_proxy=http://proxy.example.com:8080
 ```
 
 ### 📄 Лицензия
 MIT License
+
 Copyright (c) 2025 teanrus
+
 Разрешается бесплатное использование, копирование, изменение и распространение данного программного обеспечения.
 
 ### 🤝 Поддержка и обратная связь
-GitHub Issues: https://github.com/teanrus/redos-setup/issues
-Релизы: https://github.com/teanrus/redos-setup/releases
-Исходный код: https://github.com/teanrus/redos-setup
+- GitHub Issues: https://github.com/teanrus/redos-setup/issues
+- Релизы: https://github.com/teanrus/redos-setup/releases
+- Исходный код: https://github.com/teanrus/redos-setup
 
 >##### ⚠️ Важное примечание
 >- Скрипт предназначен для использования в корпоративной среде. Перед запуском убедитесь, что:
