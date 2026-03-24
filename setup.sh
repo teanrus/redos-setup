@@ -1,7 +1,7 @@
 #!/bin/bash
 # Автоматизированная настройка РЕД ОС 7.3
 # GitHub: https://github.com/teanrus/redos-setup
-# Версия: 2.2
+# Версия: 2.3
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -13,16 +13,16 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
-GITHUB_TAG="v2.2"  # Исправлено: версия соответствует скрипту
+GITHUB_TAG="v2.3"
 
 # === ФУНКЦИИ ===
 
-# Функция для безопасного чтения ввода (работает даже при curl | bash)
+# Функция для безопасного чтения ввода
 safe_read() {
     local prompt="$1"
     local answer
-    echo -e "$prompt" > /dev/tty
-    read -r answer < /dev/tty
+    echo -e "$prompt" >&2
+    read -r answer
     echo "$answer"
 }
 
@@ -45,22 +45,6 @@ check_command() {
     fi
 }
 
-# Функция отображения прогресса
-show_progress() {
-    local pid=$1
-    local delay=0.1
-    local spinstr='|/-\'
-    echo -n " "
-    while kill -0 "$pid" 2>/dev/null; do
-        local temp=${spinstr#?}
-        printf " [%c]  " "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
-        printf "\b\b\b\b\b\b"
-    done
-    printf "    \b\b\b\b"
-}
-
 # Функция скачивания с GitHub
 download_from_github() {
     local file_name=$1
@@ -73,6 +57,7 @@ download_from_github() {
     # Проверяем доступность файла
     if ! curl -s --head -f "$url" > /dev/null 2>&1; then
         echo -e "${RED}✗ Файл $file_name не найден в релизе $GITHUB_TAG${NC}"
+        echo -e "${YELLOW}Проверьте: https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/tag/$GITHUB_TAG${NC}"
         return 1
     fi
     
@@ -85,13 +70,13 @@ download_from_github() {
     fi
 }
 
-# Функция для запроса подтверждения (с безопасным чтением)
+# Функция для запроса подтверждения
 confirm_installation() {
     local component_name=$1
     local answer
     
-    echo -e "${YELLOW}Установить $component_name? (y/n)${NC}" > /dev/tty
-    read -r answer < /dev/tty
+    echo -e "${YELLOW}Установить $component_name? (y/n)${NC}"
+    read -r answer
     if [[ $answer =~ ^[Yy]$ ]]; then
         return 0
     else
@@ -101,11 +86,11 @@ confirm_installation() {
 
 # Функция выбора версии ViPNet
 select_vipnet_version() {
-    echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}" > /dev/tty
-    echo "1. ViPNet Client (без деловой почты)" > /dev/tty
-    echo "2. ViPNet + Деловая почта (DP)" > /dev/tty
-    echo -e "${YELLOW}Выберите вариант (1 или 2):${NC}" > /dev/tty
-    read -r vipnet_choice < /dev/tty
+    echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}"
+    echo "1. ViPNet Client (без деловой почты)"
+    echo "2. ViPNet + Деловая почта (DP)"
+    echo -e "${YELLOW}Выберите вариант (1 или 2):${NC}"
+    read -r vipnet_choice
     
     case $vipnet_choice in
         1)
@@ -318,9 +303,6 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
-# Перенаправляем весь ввод/вывод для интерактивности
-exec < /dev/tty > /dev/tty 2>&1
-
 echo -e "${GREEN}=== Начало настройки РЕД ОС 7.3 ===${NC}"
 echo -e "${BLUE}Дата запуска: $(date)${NC}"
 echo -e "${BLUE}GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO${NC}"
@@ -394,8 +376,8 @@ command -v viber >/dev/null 2>&1 && echo "  ✓ Viber"
 command -v vk-messenger >/dev/null 2>&1 && echo "  ✓ VK Messenger"
 command -v telegram >/dev/null 2>&1 && echo "  ✓ Telegram"
 [ -d /usr/share/fonts/liberation ] && echo "  ✓ Шрифты Liberation"
-[ -f /opt/kaspersky/agent ] 2>/dev/null && echo "  ✓ Kaspersky Agent"
-[ -f /opt/cprocsp ] 2>/dev/null && echo "  ✓ КриптоПро"
+[ -d /opt/kaspersky ] 2>/dev/null && echo "  ✓ Kaspersky Agent"
+[ -d /opt/cprocsp ] 2>/dev/null && echo "  ✓ КриптоПро"
 [ -f /etc/vipnet.conf ] && echo "  ✓ ViPNet"
 [ -d /opt/1cv8 ] 2>/dev/null && echo "  ✓ 1С:Предприятие"
 
@@ -406,17 +388,13 @@ echo -e "${YELLOW}  (ViPNet, КриптоПро, 1С) рекомендуется
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════${NC}"
 echo ""
 
-# Запрос на перезагрузку с таймаутом
-echo -e "${YELLOW}Перезагрузить систему сейчас? (y/n) - по умолчанию n через 30 секунд${NC}" > /dev/tty
-read -t 30 -r reboot_now < /dev/tty || reboot_now="n"
-echo ""
-
+# Запрос на перезагрузку
+echo -e "${YELLOW}Перезагрузить систему сейчас? (y/n)${NC}"
+read -r reboot_now
 if [[ $reboot_now =~ ^[Yy]$ ]]; then
-    echo -e "${BLUE}Система будет перезагружена через 5 секунд. Нажмите Ctrl+C для отмены...${NC}"
+    echo -e "${BLUE}Перезагрузка через 5 секунд...${NC}"
     sleep 5
-    echo -e "${BLUE}Перезагрузка...${NC}"
     sync
-    sleep 2
     reboot
 else
     echo -e "${GREEN}Перезагрузка отменена. Вы можете перезагрузить систему позже командой:${NC}"
