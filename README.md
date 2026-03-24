@@ -1,6 +1,6 @@
 # 🚀 Автоматическая настройка РЕД ОС 7.3
 
-[![Version](https://img.shields.io/badge/version-2.3-green.svg)](https://github.com/teanrus/redos-setup/releases)
+[![Version](https://img.shields.io/badge/version-2.4-green.svg)](https://github.com/teanrus/redos-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-RED%20OS%207.3-red.svg)](https://redos.ru/)
 
