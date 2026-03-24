@@ -18,7 +18,7 @@ curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.7/setup.sh 
 
 #### Или с сохранением файла:
 ```bash
-wget curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.7/setup.sh | bash
+wget curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.7/setup.sh
 chmod +x setup.sh
 sudo ./setup.sh
 ```
