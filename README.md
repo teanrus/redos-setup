@@ -3,6 +3,7 @@
 [![Version](https://img.shields.io/badge/version-2.7-green.svg)](https://github.com/teanrus/redos-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-RED%20OS%207.3-red.svg)](https://redos.ru/)
+[![Stars](https://img.shields.io/github/stars/teanrus/redos-lifehacks.svg)](https://github.com/teanrus/redos-lifehacks/stargazers)
 
 **Интеллектуальный скрипт для выборочной установки и настройки программного обеспечения на РЕД ОС 7.3.**
 
