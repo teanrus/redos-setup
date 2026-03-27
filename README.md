@@ -14,15 +14,23 @@
 #### 📋 Быстрая установка
 
 ```bash
-curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.7/setup.sh | sudo bash
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh | sudo bash
 ```
 
-#### Или с сохранением файла:
+#### Вариант 2 (с сохранением файла):
 ```bash
-wget curl -sL https://github.com/teanrus/redos-setup/releases/download/v2.7/setup.sh
+wget https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
 chmod +x setup.sh
 sudo ./setup.sh
 ```
+
+### Вариант 3 (если нет wget):
+```bash
+curl -L -o setup.sh https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
+chmod +x setup.sh
+sudo ./setup.sh
+```
+
 ---
 
 ## 🎯 Что делает скрипт
