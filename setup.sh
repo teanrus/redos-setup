@@ -1,7 +1,7 @@
 #!/bin/bash
 # Автоматизированная настройка РЕД ОС 7.3
 # GitHub: https://github.com/teanrus/redos-setup
-# Версия: 2.7
+# Версия: 2.8
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -13,9 +13,15 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
-GITHUB_TAG="v2.7"
+# Используем latest релиз вместо фиксированной версии
 
 # === ФУНКЦИИ ===
+
+# Функция для получения URL последнего релиза
+get_latest_release_url() {
+    local file_name=$1
+    echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$file_name"
+}
 
 # Функция для безопасного чтения ввода из терминала
 read_from_terminal() {
@@ -45,17 +51,17 @@ check_command() {
     fi
 }
 
-# Функция скачивания с GitHub
+# Функция скачивания с GitHub (использует latest релиз)
 download_from_github() {
     local file_name=$1
     local dest_dir=$2
     
-    local url="https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$GITHUB_TAG/$file_name"
+    local url=$(get_latest_release_url "$file_name")
     
     echo -e "${BLUE}Загрузка $file_name...${NC}"
     
     if ! curl -s --head -f "$url" > /dev/null 2>&1; then
-        echo -e "${RED}✗ Файл $file_name не найден в релизе $GITHUB_TAG${NC}"
+        echo -e "${RED}✗ Файл $file_name не найден в последнем релизе${NC}"
         return 1
     fi
     
@@ -297,16 +303,6 @@ install_messengers() {
         fi
     fi
     
-    # Viber
-    if confirm_installation "мессенджер Viber"; then
-        download_from_github "viber.rpm" "$WORK_DIR"
-        if [ -f "$WORK_DIR/viber.rpm" ]; then
-            dnf install -y "$WORK_DIR/viber.rpm"
-            check_success "Установка Viber"
-            rm -f "$WORK_DIR/viber.rpm"
-        fi
-    fi
-    
     # ВК Мессенджер
     if confirm_installation "мессенджер ВК (VK Messenger)"; then
         download_from_github "vk-messenger.rpm" "$WORK_DIR"
@@ -376,15 +372,32 @@ install_cryptopro() {
         if [ -f "$WORK_DIR/kriptopror4.tar.gz" ]; then
             cd "$WORK_DIR"
             tar -xzf kriptopror4.tar.gz
-            cd R4
+            
+            # Ищем установочный скрипт в текущей директории (без подкаталога R4)
             if [ -f "install_gui.sh" ]; then
                 chmod +x install_gui.sh
                 ./install_gui.sh
                 check_success "Установка КриптоПро"
+            elif [ -f "install.sh" ]; then
+                chmod +x install.sh
+                ./install.sh
+                check_success "Установка КриптоПро"
+            else
+                # Если скрипт не найден, пробуем установить все rpm пакеты
+                echo -e "${BLUE}Установка RPM пакетов КриптоПро...${NC}"
+                for rpm in *.rpm; do
+                    if [ -f "$rpm" ]; then
+                        dnf install -y "$rpm"
+                    fi
+                done
+                check_success "Установка КриптоПро (RPM)"
             fi
+            
             cd "$WORK_DIR"
-            rm -rf R4
             rm -f kriptopror4.tar.gz
+            # Удаляем распакованные файлы
+            rm -f *.rpm *.sh 2>/dev/null
+            rm -rf linux-amd64_deb 2>/dev/null
         fi
     else
         echo -e "${YELLOW}Пропускаем установку КриптоПро${NC}"
@@ -554,7 +567,6 @@ echo ""
 echo -e "${GREEN}Установленные компоненты:${NC}"
 command -v chromium-gost >/dev/null 2>&1 && echo "  ✓ Chromium-GOST"
 command -v sreda >/dev/null 2>&1 && echo "  ✓ СРЕДА"
-command -v viber >/dev/null 2>&1 && echo "  ✓ Viber"
 command -v vk-messenger >/dev/null 2>&1 && echo "  ✓ VK Messenger"
 command -v telegram >/dev/null 2>&1 && echo "  ✓ Telegram"
 [ -d /usr/share/fonts/liberation ] && echo "  ✓ Шрифты Liberation"
