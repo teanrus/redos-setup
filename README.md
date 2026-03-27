@@ -1,6 +1,6 @@
 # 🚀 Автоматическая настройка РЕД ОС 7.3
 
-[![Version](https://img.shields.io/badge/version-2.7-green.svg)](https://github.com/teanrus/redos-setup/releases)
+[![Version](https://img.shields.io/badge/version-2.8-green.svg)](https://github.com/teanrus/redos-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-RED%20OS%207.3-red.svg)](https://redos.red-soft.ru/)
 [![Stars](https://img.shields.io/github/stars/teanrus/redos-setup.svg)](https://github.com/teanrus/redos-setup/stargazers)
@@ -24,7 +24,7 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-### Вариант 3 (если нет wget):
+#### Вариант 3 (если нет wget):
 ```bash
 curl -L -o setup.sh https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
 chmod +x setup.sh
