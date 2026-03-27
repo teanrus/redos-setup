@@ -1,4 +1,4 @@
-# 🚀 Автоматическая настройка РЕД ОС 7.3
+# 🚀 Автоматизированная настройка АРМ РЕД ОС
 
 [![Version](https://img.shields.io/badge/version-2.8-green.svg)](https://github.com/teanrus/redos-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
