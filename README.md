@@ -157,7 +157,7 @@ Telegram
 - После установки выполняется fc-cache -fv для обновления кэша шрифтов
 
 КриптоПро
-- начала устанавливаются зависимые пакеты: ifd-rutokens, token-manager, gostcryptogui, caja-gostcryptogui
+- Сначала устанавливаются зависимые пакеты: ifd-rutokens, token-manager, gostcryptogui, caja-gostcryptogui
 - Затем распаковывается архив kriptopror4.tar.gz
 - Запускается графический установщик install_gui.sh
 
