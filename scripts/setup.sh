@@ -32,6 +32,85 @@ read_from_terminal() {
     echo "$answer"
 }
 
+# Функция определения версии ОС и совместимости компонентов
+detect_os_version() {
+    OS_NAME="Неизвестная ОС"
+    OS_VERSION_ID="unknown"
+    OS_MAJOR_VERSION=""
+    IS_REDOS=0
+    CRYPTOPRO_SUPPORTED=0
+    VIPNET_SUPPORTED=0
+
+    if [ -r /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release
+        OS_NAME="${PRETTY_NAME:-${NAME:-$OS_NAME}}"
+        OS_VERSION_ID="${VERSION_ID:-$OS_VERSION_ID}"
+    fi
+
+    case "${ID:-}" in
+        redos|redos7|redos8)
+            IS_REDOS=1
+            ;;
+    esac
+
+    if [[ "$OS_VERSION_ID" =~ ^([0-9]+) ]]; then
+        OS_MAJOR_VERSION="${BASH_REMATCH[1]}"
+    fi
+
+    if [ "$IS_REDOS" -eq 1 ] && [ "$OS_MAJOR_VERSION" = "7" ]; then
+        CRYPTOPRO_SUPPORTED=1
+        VIPNET_SUPPORTED=1
+    fi
+}
+
+# Функция вывода информации о версии ОС и предупреждений о совместимости
+show_os_compatibility_info() {
+    echo -e "${BLUE}Обнаружена ОС: $OS_NAME${NC}"
+
+    if [ "$IS_REDOS" -ne 1 ]; then
+        echo -e "${YELLOW}Внимание: скрипт разработан для РЕД ОС 7.3 и частично адаптирован под РЕД ОС 8+. Текущая ОС не распознана как РЕД ОС.${NC}"
+        return
+    fi
+
+    if [ -n "$OS_MAJOR_VERSION" ]; then
+        echo -e "${BLUE}Основная версия РЕД ОС: $OS_MAJOR_VERSION${NC}"
+    fi
+
+    if [ "$OS_MAJOR_VERSION" = "7" ]; then
+        echo -e "${GREEN}Режим совместимости: доступны все штатные компоненты скрипта, включая КриптоПро и ViPNet.${NC}"
+    elif [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+        echo -e "${YELLOW}Внимание: скрипт изначально разрабатывался и тестировался для РЕД ОС 7.3.${NC}"
+        echo -e "${YELLOW}Для РЕД ОС $OS_VERSION_ID пакеты КриптоПро и ViPNet из этого скрипта не подходят и будут автоматически исключены из установки.${NC}"
+        echo -e "${YELLOW}Остальные компоненты будут предложены к установке как обычно.${NC}"
+    else
+        echo -e "${YELLOW}Не удалось однозначно определить основную версию РЕД ОС. КриптоПро и ViPNet будут недоступны для безопасности.${NC}"
+    fi
+}
+
+# Функция проверки доступности компонента для текущей версии ОС
+is_component_supported() {
+    local component_name=$1
+
+    case "$component_name" in
+        cryptopro)
+            [ "$CRYPTOPRO_SUPPORTED" -eq 1 ]
+            ;;
+        vipnet)
+            [ "$VIPNET_SUPPORTED" -eq 1 ]
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
+
+# Функция вывода предупреждения о несовместимости компонента
+warn_component_not_supported() {
+    local component_label=$1
+    echo -e "${YELLOW}Пропускаем $component_label: в текущем выпуске скрипта доступны пакеты только для РЕД ОС 7.x, а обнаружена ${OS_NAME}.${NC}"
+}
+
 # Функция для проверки успешности выполнения команд
 check_success() {
     if [ $? -eq 0 ]; then
@@ -232,6 +311,11 @@ install_liberation_fonts() {
 
 # Функция выбора версии ViPNet
 select_vipnet_version() {
+    if ! is_component_supported "vipnet"; then
+        warn_component_not_supported "установку ViPNet"
+        return 0
+    fi
+
     echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}" >&2
     echo "1. ViPNet Client (без деловой почты)" >&2
     echo "2. ViPNet + Деловая почта (DP)" >&2
@@ -362,6 +446,11 @@ install_kaspersky() {
 
 # Функция установки КриптоПро
 install_cryptopro() {
+    if ! is_component_supported "cryptopro"; then
+        warn_component_not_supported "установку КриптоПро"
+        return 0
+    fi
+
     if confirm_installation "КриптоПро и дополнительные пакеты"; then
         echo -e "${GREEN}Установка КриптоПро...${NC}"
         
@@ -481,9 +570,13 @@ if [ ! -e /dev/tty ]; then
     exit 1
 fi
 
-echo -e "${GREEN}=== Начало настройки РЕД ОС 7.3 ===${NC}"
+# Определение версии ОС и совместимости компонентов
+detect_os_version
+
+echo -e "${GREEN}=== Начало настройки РЕД ОС ===${NC}"
 echo -e "${BLUE}Дата запуска: $(date)${NC}"
 echo -e "${BLUE}GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO${NC}"
+show_os_compatibility_info
 echo ""
 
 # Отключаем SELinux
@@ -537,8 +630,10 @@ install_kaspersky
 install_cryptopro
 
 # ViPNet (с выбором версии)
-if confirm_installation "ViPNet"; then
+if is_component_supported "vipnet" && confirm_installation "ViPNet"; then
     select_vipnet_version
+elif ! is_component_supported "vipnet"; then
+    warn_component_not_supported "установку ViPNet"
 else
     echo -e "${YELLOW}Пропускаем установку ViPNet${NC}"
 fi
