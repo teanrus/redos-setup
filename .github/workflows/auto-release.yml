@@ -1,0 +1,109 @@
+name: Auto Release Setup Script
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'scripts/setup.sh'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.github/workflows/auto-release.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v2.9 or latest'
+        required: true
+        default: 'latest'
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  publish-setup-script:
+    name: Publish setup.sh to Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Determine release tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="latest"
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using tag: $TAG"
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          cp scripts/setup.sh release-assets/setup.sh
+          sha256sum release-assets/setup.sh | awk '{print $1 "  setup.sh"}' > release-assets/setup.sh.sha256
+
+          echo "Prepared assets:"
+          ls -la release-assets
+
+      - name: Build release notes
+        id: notes
+        run: |
+          {
+            echo "## Included assets"
+            echo ""
+            echo "| File | Description |"
+            echo "| :--- | :---------- |"
+            echo "| \`setup.sh\` | Main installation script for RED OS workstations |"
+            echo "| \`setup.sh.sha256\` | SHA256 checksum for integrity verification |"
+            echo ""
+            echo "## Quick start"
+            echo ""
+            echo '```bash'
+            echo 'curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh | sudo bash'
+            echo '```'
+            echo ""
+            echo "## Verify checksum"
+            echo ""
+            echo '```bash'
+            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh'
+            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh.sha256'
+            echo 'sha256sum -c setup.sh.sha256'
+            echo '```'
+            echo ""
+            echo "## Notes"
+            echo ""
+            echo "- The script supports RED OS 7.x and 8+."
+            echo "- On RED OS 8+, CryptoPro and ViPNet from the current release are skipped as incompatible."
+          } > release-body.md
+
+          {
+            echo "body<<EOF"
+            cat release-body.md
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: redos-setup ${{ steps.version.outputs.tag }}
+          body: ${{ steps.notes.outputs.body }}
+          draft: false
+          prerelease: ${{ steps.version.outputs.tag == 'latest' }}
+          generate_release_notes: false
+          files: |
+            release-assets/setup.sh
+            release-assets/setup.sh.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Job summary
+        run: |
+          echo "Release updated: ${{ steps.version.outputs.tag }}"
+          echo "Attached files:"
+          ls -1 release-assets

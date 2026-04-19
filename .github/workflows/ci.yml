@@ -1,0 +1,130 @@
+name: CI - Shell and Docs Validation
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '**/*.sh'
+      - '**/*.md'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - '**/*.sh'
+      - '**/*.md'
+      - '.github/workflows/ci.yml'
+
+jobs:
+  shellcheck:
+    name: ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Find shell scripts
+        id: find-scripts
+        run: |
+          mapfile -t scripts < <(find . -name '*.sh' -type f | sort)
+          echo "Found ${#scripts[@]} shell script(s)"
+          printf '  %s\n' "${scripts[@]}"
+          {
+            echo "scripts<<EOF"
+            printf '%s\n' "${scripts[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run ShellCheck
+        run: |
+          exit_code=0
+          while IFS= read -r script; do
+            [ -n "$script" ] || continue
+            echo ""
+            echo "Checking $script"
+            if ! shellcheck \
+              --shell=bash \
+              --severity=warning \
+              --exclude=SC1090,SC1091 \
+              "$script"; then
+              exit_code=1
+            fi
+          done << 'EOF'
+          ${{ steps.find-scripts.outputs.scripts }}
+          EOF
+          exit $exit_code
+
+  bash-syntax:
+    name: Bash Syntax Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Check script syntax
+        run: |
+          exit_code=0
+          while IFS= read -r script; do
+            [ -n "$script" ] || continue
+            echo "Syntax check: $script"
+            if ! bash -n "$script"; then
+              exit_code=1
+            fi
+          done < <(find . -name '*.sh' -type f | sort)
+          exit $exit_code
+
+  markdown-links:
+    name: Markdown Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Validate local markdown links
+        run: |
+          python3 - << 'PY'
+          import re
+          import sys
+          from pathlib import Path
+          from urllib.parse import urlparse, unquote
+
+          repo_root = Path('.').resolve()
+          markdown_files = sorted(repo_root.rglob('*.md'))
+          errors = []
+
+          link_pattern = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
+
+          for md_file in markdown_files:
+            text = md_file.read_text(encoding='utf-8')
+            for raw_target in link_pattern.findall(text):
+              target = raw_target.strip()
+              if not target or target.startswith('#'):
+                continue
+              if target.startswith('mailto:'):
+                continue
+
+              parsed = urlparse(target)
+              if parsed.scheme in ('http', 'https'):
+                continue
+
+              path_part = unquote(parsed.path)
+              if path_part.startswith('/abs/path/'):
+                continue
+
+              candidate = (md_file.parent / path_part).resolve()
+              if not candidate.exists():
+                errors.append(f"{md_file.relative_to(repo_root)} -> {target}")
+
+          if errors:
+            print('Broken local markdown links found:')
+            for error in errors:
+              print(f'  - {error}')
+            sys.exit(1)
+
+          print('All local markdown links are valid.')
+          PY
+

@@ -70,6 +70,34 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
+## Automation
+
+В репозитории настроены GitHub Actions для базовой проверки качества и публикации релизных артефактов.
+
+### Continuous Integration
+
+Workflow `CI - Shell and Docs Validation` запускается на `push` и `pull_request` для изменений в shell-скриптах, Markdown-файлах и конфигурации workflow.
+
+Он выполняет:
+
+- `ShellCheck` для всех `*.sh` файлов;
+- `bash -n` для синтаксической проверки shell-скриптов;
+- проверку локальных ссылок в Markdown-документах.
+
+### Releases
+
+Workflow `Auto Release Setup Script` публикует релизные артефакты проекта:
+
+- `setup.sh`;
+- `setup.sh.sha256`.
+
+Поведение релизного workflow:
+
+- при `push` в `main` или `master` обновляется release с тегом `latest`;
+- при ручном запуске можно указать собственный тег, например `v2.9`.
+
+Это позволяет отделить постоянно обновляемый release для быстрого скачивания от именованных релизов.
+
 ## Requirements
 
 | Параметр | Значение |
@@ -268,11 +296,25 @@ ViPNet:
 
 ```text
 .
+├── .github/
+│   └── workflows/
+│       ├── auto-release.yml
+│       └── ci.yml
+├── CHANGELOG.md
+├── CONTRIBUTING.md
 ├── README.md
+├── SECURITY.md
 ├── LICENSE
 └── scripts/
     └── setup.sh
 ```
+
+## Project Documentation
+
+- [README.md](README.md) - обзор проекта, совместимость, установка и описание поведения
+- [CONTRIBUTING.md](CONTRIBUTING.md) - правила и рекомендации для изменений в репозитории
+- [CHANGELOG.md](CHANGELOG.md) - заметные изменения по релизам и в `Unreleased`
+- [SECURITY.md](SECURITY.md) - краткая политика по поддерживаемым версиям и сообщениям об уязвимостях
 
 ## Development
 
