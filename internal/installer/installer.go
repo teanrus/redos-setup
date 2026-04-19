@@ -202,19 +202,4 @@ func (i *Installer) runCommandWithOutput(name string, args ...string) (string, e
     return string(output), nil
 }
 
-// Заглушки для функций установки (временно)
-func (i *Installer) installBaseSystem() error { logger.Info("Установка базовой системы..."); return nil }
-func (i *Installer) installTelegram() error { logger.Info("Установка Telegram..."); return nil }
-func (i *Installer) installVipNet() error { logger.Info("Установка ViPNet..."); return nil }
-func (i *Installer) install1C() error { logger.Info("Установка 1С..."); return nil }
-func (i *Installer) installCryptoPro() error { logger.Info("Установка КриптоПро..."); return nil }
-func (i *Installer) installKaspersky() error { logger.Info("Установка Kaspersky..."); return nil }
-func (i *Installer) installChromium() error { logger.Info("Установка Chromium..."); return nil }
-func (i *Installer) installYandexBrowser() error { logger.Info("Установка Яндекс.Браузера..."); return nil }
-func (i *Installer) installSreda() error { logger.Info("Установка СРЕДА..."); return nil }
-func (i *Installer) installVK() error { logger.Info("Установка VK..."); return nil }
-func (i *Installer) installFonts() error { logger.Info("Установка шрифтов..."); return nil }
-func (i *Installer) setupTRIM() error { logger.Info("Настройка TRIM..."); return nil }
-func (i *Installer) updateGRUB() error { logger.Info("Обновление GRUB..."); return nil }
-func (i *Installer) setupKSG() error { logger.Info("Настройка KSG..."); return nil }
-func (i *Installer) installAll() error { logger.Info("Установка всего..."); return nil }
+
