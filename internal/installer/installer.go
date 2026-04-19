@@ -200,9 +200,10 @@ func (i *Installer) runCommandWithOutput(name string, args ...string) (string, e
     }
     
     return string(output), nil
+}
 
 // ============================================================================
-// ЗАГЛУШКИ МЕТОДОВ УСТАНОВКИ (временные, пока не реализованы)
+// ЗАГЛУШКИ МЕТОДОВ УСТАНОВКИ (временные)
 // ============================================================================
 
 func (i *Installer) installBaseSystem() error {
@@ -310,7 +311,3 @@ func (i *Installer) installAll() error {
     logger.Success("Все компоненты установлены")
     return nil
 }
-
-}
-
-
