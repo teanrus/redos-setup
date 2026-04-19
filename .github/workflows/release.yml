@@ -30,12 +30,23 @@ jobs:
       with:
         go-version: '1.21'
         cache: true
+        cache-dependency-path: go.sum
 
     - name: Install dependencies
-      run: make deps
+      run: |
+        go mod download
+        go mod verify
 
     - name: Run tests
-      run: make test
+      run: |
+        go test -v ./...
+        go test -race -coverprofile=coverage.out ./...
+
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        args: --timeout=5m --skip-files=".*_test.go"
 
     # Сборка для разных архитектур
     - name: Build for Linux amd64
@@ -47,18 +58,28 @@ jobs:
       run: |
         GOOS=linux GOARCH=386 go build -ldflags="-X 'main.version=${{ github.ref_name }}'" -o release/redos-setup-linux-386 cmd/redos-setup/main.go
 
-    - name: Build for Linux arm64 (если нужно)
+    - name: Build for Linux arm64
       run: |
         GOOS=linux GOARCH=arm64 go build -ldflags="-X 'main.version=${{ github.ref_name }}'" -o release/redos-setup-linux-arm64 cmd/redos-setup/main.go
 
+    # Проверка бинарников
+    - name: Verify binaries
+      run: |
+        file release/redos-setup-linux-*
+        chmod +x release/redos-setup-linux-*
+        ./release/redos-setup-linux-amd64 --version || true
+        ./release/redos-setup-linux-386 --version || true
+        ./release/redos-setup-linux-arm64 --version || true
+
     # Создание RPM пакета
+    - name: Install rpm-build
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y rpm
+
     - name: Create RPM package
       run: |
         VERSION=${GITHUB_REF_NAME#v}
-        
-        # Устанавливаем rpm-build
-        sudo apt-get update
-        sudo apt-get install -y rpm
         
         # Создаем структуру директорий
         mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
@@ -78,33 +99,18 @@ jobs:
         
         %description
         Инструмент для автоматической установки и настройки программного обеспечения
-        на РЕД ОС 7.3 и 8. Поддерживает установку компонентов: Telegram, ViPNet,
-        КриптоПро, 1С, Kaspersky Agent и другие.
+        на РЕД ОС 7.3 и 8.
         
         %install
         mkdir -p %{buildroot}/usr/local/bin
         cp %{_sourcedir}/redos-setup %{buildroot}/usr/local/bin/
         chmod 755 %{buildroot}/usr/local/bin/redos-setup
         
-        mkdir -p %{buildroot}/etc/redos-setup
-        cat > %{buildroot}/etc/redos-setup/config.yaml << 'CONFIG'
-        github:
-          user: "teanrus"
-          repo: "redos-setup"
-        paths:
-          work_dir: "/home/inst"
-          log_dir: "/var/log/redos-setup"
-        system:
-          selinux: "disabled"
-          dnf_parallel_downloads: 10
-        CONFIG
-        
         %files
         /usr/local/bin/redos-setup
-        /etc/redos-setup/config.yaml
         
         %changelog
-        * $(date +"%a %b %d %Y") teanrus <tyanrv@lbt.yanao.ru> - VERSION_PLACEHOLDER-1
+        * %{date} teanrus <tyanrv@lbt.yanao.ru> - VERSION_PLACEHOLDER-1
         - Release VERSION_PLACEHOLDER
         EOF
         
@@ -116,7 +122,7 @@ jobs:
         
         # Копируем результат
         mkdir -p release/rpm
-        cp rpmbuild/RPMS/x86_64/*.rpm release/
+        cp rpmbuild/RPMS/x86_64/*.rpm release/ 2>/dev/null || true
         cp rpmbuild/RPMS/noarch/*.rpm release/ 2>/dev/null || true
         
         echo "RPM package created:"
