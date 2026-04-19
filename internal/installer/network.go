@@ -4,6 +4,7 @@ import (
     "bufio"
     "fmt"
     "os"
+    "path/filepath"
     "strings"
     
     "github.com/teanrus/redos-setup/internal/logger"

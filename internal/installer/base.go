@@ -2,7 +2,6 @@ package installer
 
 import (
     "fmt"
-    "strings"
     
     "github.com/teanrus/redos-setup/internal/logger"
 )
