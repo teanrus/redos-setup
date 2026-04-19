@@ -200,6 +200,117 @@ func (i *Installer) runCommandWithOutput(name string, args ...string) (string, e
     }
     
     return string(output), nil
+
+// ============================================================================
+// ЗАГЛУШКИ МЕТОДОВ УСТАНОВКИ (временные, пока не реализованы)
+// ============================================================================
+
+func (i *Installer) installBaseSystem() error {
+    logger.Info("Установка базовой системы...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installTelegram() error {
+    logger.Info("Установка Telegram...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installVipNet() error {
+    logger.Info("Установка ViPNet...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) install1C() error {
+    logger.Info("Установка 1С...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installCryptoPro() error {
+    logger.Info("Установка КриптоПро...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installKaspersky() error {
+    logger.Info("Установка Kaspersky Agent...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installChromium() error {
+    logger.Info("Установка Chromium-GOST...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installYandexBrowser() error {
+    logger.Info("Установка Яндекс.Браузера...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installSreda() error {
+    logger.Info("Установка мессенджера СРЕДА...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installVK() error {
+    logger.Info("Установка VK Messenger...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installFonts() error {
+    logger.Info("Установка шрифтов Liberation...")
+    logger.Warn("Это заглушка. Реальная установка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) setupTRIM() error {
+    logger.Info("Настройка TRIM для SSD...")
+    logger.Warn("Это заглушка. Реальная настройка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) updateGRUB() error {
+    logger.Info("Обновление конфигурации GRUB...")
+    logger.Warn("Это заглушка. Реальное обновление будет добавлено позже.")
+    return nil
+}
+
+func (i *Installer) setupKSG() error {
+    logger.Info("Настройка для моноблока KSG...")
+    logger.Warn("Это заглушка. Реальная настройка будет добавлена позже.")
+    return nil
+}
+
+func (i *Installer) installAll() error {
+    logger.Info("Установка ВСЕХ компонентов...")
+    
+    components := []string{
+        "base-system", "fonts", "chromium", "yandex", "sreda",
+        "vk", "telegram", "kaspersky", "cryptopro", "vipnet", "1c",
+        "trim", "grub", "ksg",
+    }
+    
+    for _, component := range components {
+        if err := i.installComponent(component); err != nil {
+            logger.Error("Ошибка установки %s: %v", component, err)
+            if !i.force {
+                return err
+            }
+        }
+    }
+    
+    logger.Success("Все компоненты установлены")
+    return nil
+}
+
 }
 
 
