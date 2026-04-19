@@ -5,6 +5,7 @@
 [![Version](https://img.shields.io/badge/version-2.9-green?style=for-the-badge)](https://github.com/teanrus/redos-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 [![РЕД ОС](https://img.shields.io/badge/РЕД%20ОС-7.3-red?style=for-the-badge&logo=linux)](https://redos.red-soft.ru/)
+[![GitHub Releases](https://img.shields.io/github/downloads/teanrus/redos-setup/total?style=for-the-badge&logo=github)](https://github.com/teanrus/redos-setup/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/teanrus/redos-setup?style=for-the-badge&logo=github)](https://github.com/teanrus/redos-setup/stargazers)
 
 Скрипт последовательно запрашивает согласие на установку каждого компонента и **скачивает только выбранные программы** из GitHub Releases, экономя трафик и время. Поддерживает ленивую загрузку — файлы загружаются только при подтверждении пользователя и удаляются после установки.
