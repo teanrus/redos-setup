@@ -52,7 +52,7 @@ jobs:
         go build -o build/redos-setup cmd/redos-setup/main.go
 
     - name: Upload build artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: redos-setup-go${{ matrix.go-version }}
         path: build/
