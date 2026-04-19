@@ -3,7 +3,7 @@
 Скрипт для автоматизации первичной настройки рабочих мест на РЕД ОС. Проект выполняет выборочную установку системных и прикладных компонентов, определяет версию ОС, запрашивает подтверждение пользователя перед каждым дополнительным шагом и загружает артефакты только по мере необходимости.
 
 [![Version](https://img.shields.io/badge/version-2.8-yellow?style=for-the-badge)](https://github.com/teanrus/redos-setup/releases)
-[![License](https://img.shields.io/badge/license-MIT?style=for-the-badge)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 [![РЕД ОС](https://img.shields.io/badge/РЕД%20ОС-7.x%20%2F%208%2B-red?style=for-the-badge&logo=linux)](https://redos.red-soft.ru/)
 [![GitHub Releases](https://img.shields.io/github/downloads/teanrus/redos-setup/total?style=for-the-badge&logo=github)](https://github.com/teanrus/redos-setup/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/teanrus/redos-setup?style=for-the-badge&logo=github)](https://github.com/teanrus/redos-setup/stargazers)
