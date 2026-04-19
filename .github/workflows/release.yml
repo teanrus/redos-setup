@@ -1,0 +1,154 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag (e.g., v3.0.0)'
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Release ${{ github.ref_name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.21'
+        cache: true
+
+    - name: Install dependencies
+      run: make deps
+
+    - name: Run tests
+      run: make test
+
+    # Сборка для разных архитектур
+    - name: Build for Linux amd64
+      run: |
+        mkdir -p release
+        GOOS=linux GOARCH=amd64 go build -ldflags="-X 'main.version=${{ github.ref_name }}' -X 'main.buildDate=$(date -u +%Y-%m-%d_%H:%M:%S)'" -o release/redos-setup-linux-amd64 cmd/redos-setup/main.go
+
+    - name: Build for Linux 386
+      run: |
+        GOOS=linux GOARCH=386 go build -ldflags="-X 'main.version=${{ github.ref_name }}'" -o release/redos-setup-linux-386 cmd/redos-setup/main.go
+
+    - name: Build for Linux arm64 (если нужно)
+      run: |
+        GOOS=linux GOARCH=arm64 go build -ldflags="-X 'main.version=${{ github.ref_name }}'" -o release/redos-setup-linux-arm64 cmd/redos-setup/main.go
+
+    # Создание RPM пакета
+    - name: Create RPM package
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        
+        # Устанавливаем rpm-build
+        sudo apt-get update
+        sudo apt-get install -y rpm
+        
+        # Создаем структуру директорий
+        mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+        
+        # Копируем бинарник
+        cp release/redos-setup-linux-amd64 rpmbuild/SOURCES/redos-setup
+        
+        # Создаем spec файл
+        cat > rpmbuild/SPECS/redos-setup.spec << 'EOF'
+        Name: redos-setup
+        Version: VERSION_PLACEHOLDER
+        Release: 1%{?dist}
+        Summary: CLI для автоматической настройки РЕД ОС 7.3/8
+        License: MIT
+        URL: https://github.com/teanrus/redos-setup
+        Requires: golang >= 1.21
+        
+        %description
+        Инструмент для автоматической установки и настройки программного обеспечения
+        на РЕД ОС 7.3 и 8. Поддерживает установку компонентов: Telegram, ViPNet,
+        КриптоПро, 1С, Kaspersky Agent и другие.
+        
+        %install
+        mkdir -p %{buildroot}/usr/local/bin
+        cp %{_sourcedir}/redos-setup %{buildroot}/usr/local/bin/
+        chmod 755 %{buildroot}/usr/local/bin/redos-setup
+        
+        mkdir -p %{buildroot}/etc/redos-setup
+        cat > %{buildroot}/etc/redos-setup/config.yaml << 'CONFIG'
+        github:
+          user: "teanrus"
+          repo: "redos-setup"
+        paths:
+          work_dir: "/home/inst"
+          log_dir: "/var/log/redos-setup"
+        system:
+          selinux: "disabled"
+          dnf_parallel_downloads: 10
+        CONFIG
+        
+        %files
+        /usr/local/bin/redos-setup
+        /etc/redos-setup/config.yaml
+        
+        %changelog
+        * $(date +"%a %b %d %Y") teanrus <tyanrv@lbt.yanao.ru> - VERSION_PLACEHOLDER-1
+        - Release VERSION_PLACEHOLDER
+        EOF
+        
+        # Подставляем версию
+        sed -i "s/VERSION_PLACEHOLDER/$VERSION/g" rpmbuild/SPECS/redos-setup.spec
+        
+        # Собираем RPM
+        rpmbuild -bb rpmbuild/SPECS/redos-setup.spec --define "_topdir $(pwd)/rpmbuild"
+        
+        # Копируем результат
+        mkdir -p release/rpm
+        cp rpmbuild/RPMS/x86_64/*.rpm release/
+        cp rpmbuild/RPMS/noarch/*.rpm release/ 2>/dev/null || true
+        
+        echo "RPM package created:"
+        ls -la release/*.rpm
+
+    # Создание архива с исходниками
+    - name: Create source archive
+      run: |
+        VERSION=${GITHUB_REF_NAME#v}
+        git archive --format=tar.gz --output=release/redos-setup-$VERSION-source.tar.gz HEAD
+
+    # Создание checksums
+    - name: Create checksums
+      run: |
+        cd release
+        sha256sum * > checksums.txt
+        cat checksums.txt
+
+    # Создание релиза на GitHub
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        files: |
+          release/redos-setup-linux-amd64
+          release/redos-setup-linux-386
+          release/redos-setup-linux-arm64
+          release/*.rpm
+          release/*.tar.gz
+          release/checksums.txt
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

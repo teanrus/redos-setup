@@ -1,0 +1,72 @@
+name: Build CLI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.21', '1.22', '1.23']
+        os: [ubuntu-latest]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go ${{ matrix.go-version }}
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go-version }}
+        cache: true
+
+    - name: Install dependencies
+      run: make deps
+
+    - name: Run linter
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+        args: --timeout=5m
+
+    - name: Run tests
+      run: make test
+
+    - name: Build for Linux amd64
+      run: |
+        mkdir -p build
+        GOOS=linux GOARCH=amd64 go build -ldflags="-X 'main.version=${{ github.sha }}' -X 'main.buildDate=$(date -u +%Y-%m-%d_%H:%M:%S)'" -o build/redos-setup-linux-amd64 cmd/redos-setup/main.go
+
+    - name: Build for Linux 386
+      run: |
+        GOOS=linux GOARCH=386 go build -ldflags="-X 'main.version=${{ github.sha }}'" -o build/redos-setup-linux-386 cmd/redos-setup/main.go
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: redos-setup-${{ matrix.go-version }}-${{ matrix.os }}
+        path: build/
+        retention-days: 7
+
+    - name: Create checksums
+      run: |
+        cd build
+        sha256sum * > checksums.txt
+        cat checksums.txt
+
+    - name: Upload checksums
+      uses: actions/upload-artifact@v4
+      with:
+        name: checksums-${{ matrix.go-version }}
+        path: build/checksums.txt
+        retention-days: 7

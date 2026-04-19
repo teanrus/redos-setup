@@ -1,0 +1,55 @@
+Name: redos-setup
+Version: VERSION_PLACEHOLDER
+Release: 1%{?dist}
+Summary: CLI для автоматической настройки РЕД ОС 7.3/8
+License: MIT
+URL: https://github.com/teanrus/redos-setup
+Requires: golang >= 1.21
+
+%description
+Инструмент для автоматической установки и настройки программного обеспечения
+на РЕД ОС 7.3 и 8.
+
+Поддерживаемые компоненты:
+- Базовая система (репозитории, ядро, R7 Office, MAX)
+- Мессенджеры: Telegram, VK, СРЕДА
+- Браузеры: Яндекс.Браузер, Chromium-GOST
+- Криптография: КриптоПро CSP, ViPNet VPN
+- Безопасность: Kaspersky Agent
+- Офисные: 1С:Предприятие, шрифты Liberation
+
+%install
+mkdir -p %{buildroot}/usr/local/bin
+cp %{_sourcedir}/redos-setup %{buildroot}/usr/local/bin/
+chmod 755 %{buildroot}/usr/local/bin/redos-setup
+
+mkdir -p %{buildroot}/etc/redos-setup
+cat > %{buildroot}/etc/redos-setup/config.yaml << 'CONFIG'
+# Конфигурация redos-setup
+github:
+  user: "teanrus"
+  repo: "redos-setup"
+
+paths:
+  work_dir: "/home/inst"
+  log_dir: "/var/log/redos-setup"
+
+system:
+  selinux: "disabled"
+  dnf_parallel_downloads: 10
+
+compatibility:
+  strict_mode: false
+  show_warnings: true
+CONFIG
+
+%files
+/usr/local/bin/redos-setup
+/etc/redos-setup/config.yaml
+
+%changelog
+* %{date} teanrus <tyanrv@lbt.yanao.ru> - VERSION_PLACEHOLDER-1
+- Initial RPM release
+- Support RED OS 7.3 and 8.0
+- CLI interface with cobra
+- Component compatibility check

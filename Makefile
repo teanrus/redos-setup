@@ -24,6 +24,8 @@ install: build
 clean:
 	@echo "🧹 Очистка..."
 	rm -rf $(BUILD_DIR)
+	rm -rf rpmbuild
+	rm -rf release
 	go clean
 
 test:
@@ -38,73 +40,64 @@ deps:
 	go mod download
 	go mod tidy
 
+# Сборка для всех платформ
 build-all: deps
 	@echo "🔨 Сборка для всех платформ..."
+	@mkdir -p $(BUILD_DIR)
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 cmd/redos-setup/main.go
 	GOOS=linux GOARCH=386 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-386 cmd/redos-setup/main.go
+	GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-linux-arm64 cmd/redos-setup/main.go
 	@echo "✅ Сборка завершена"
 
-package-deb: build
-	@echo "📦 Создание DEB пакета..."
-	mkdir -p package/DEBIAN
-	mkdir -p package/usr/local/bin
-	mkdir -p package/etc/redos-setup
-	cp $(BUILD_DIR)/$(BINARY_NAME) package/usr/local/bin/
-	cp configs/default.yaml package/etc/redos-setup/config.yaml
-	cat > package/DEBIAN/control << EOF
-Package: redos-setup
-Version: $(VERSION)
-Section: admin
-Priority: optional
-Architecture: amd64
-Maintainer: teanrus <tyanrv@lbt.yanao.ru>
-Description: CLI для автоматической настройки РЕД ОС 7.3/8
- Инструмент для установки и настройки программного обеспечения
- на РЕД ОС 7.3 и 8.
-EOF
-	dpkg-deb --build package redos-setup-$(VERSION).deb
-	rm -rf package
-	@echo "✅ DEB пакет создан: redos-setup-$(VERSION).deb"
-
-package-rpm: build
+# Создание RPM пакета
+package-rpm: build-all
 	@echo "📦 Создание RPM пакета..."
-	mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-	cp $(BUILD_DIR)/$(BINARY_NAME) rpmbuild/SOURCES/
-	cat > rpmbuild/SPECS/redos-setup.spec << EOF
-Name: redos-setup
-Version: $(VERSION)
-Release: 1%{?dist}
-Summary: CLI для автоматической настройки РЕД ОС
-License: MIT
-URL: https://github.com/teanrus/redos-setup
+	@echo "Устанавливаем rpm-build..."
+	sudo apt-get update && sudo apt-get install -y rpm 2>/dev/null || true
+	sudo dnf install -y rpm-build 2>/dev/null || true
+	
+	@mkdir -p rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+	@cp $(BUILD_DIR)/$(BINARY_NAME)-linux-amd64 rpmbuild/SOURCES/$(BINARY_NAME)
+	
+	@VERSION=$(VERSION); \
+	sed "s/VERSION_PLACEHOLDER/$$VERSION/g" scripts/redos-setup.spec.in > rpmbuild/SPECS/redos-setup.spec
+	
+	@rpmbuild -bb rpmbuild/SPECS/redos-setup.spec --define "_topdir $(PWD)/rpmbuild"
+	@mkdir -p release
+	@cp rpmbuild/RPMS/x86_64/*.rpm release/ 2>/dev/null || true
+	@cp rpmbuild/RPMS/noarch/*.rpm release/ 2>/dev/null || true
+	@echo "✅ RPM пакет создан в директории release/"
 
-%description
-Инструмент для автоматической установки и настройки ПО на РЕД ОС 7.3 и 8.
+# CI/CD цели
+ci-deps:
+	@echo "Installing CI dependencies..."
+	go mod download
+	go mod verify
 
-%install
-mkdir -p %{buildroot}/usr/local/bin
-cp %{_sourcedir}/redos-setup %{buildroot}/usr/local/bin/
-chmod +x %{buildroot}/usr/local/bin/redos-setup
+ci-lint:
+	@echo "Running linter..."
+	golangci-lint run --timeout=5m
 
-%files
-/usr/local/bin/redos-setup
+ci-test:
+	@echo "Running tests..."
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -func=coverage.out
 
-%changelog
-* $(date +"%a %b %d %Y") teanrus <tyanrv@lbt.yanao.ru> - $(VERSION)-1
-- Initial RPM release
-EOF
-	rpmbuild -bb rpmbuild/SPECS/redos-setup.spec --define "_topdir $(PWD)/rpmbuild"
-	@echo "✅ RPM пакет создан"
+ci-build:
+	@echo "Building for CI..."
+	mkdir -p build
+	go build -o build/redos-setup cmd/redos-setup/main.go
 
-.PHONY: help
+ci: ci-deps ci-lint ci-test ci-build
+	@echo "CI completed successfully!"
+
 help:
 	@echo "Доступные команды:"
-	@echo "  make build       - Собрать бинарный файл"
-	@echo "  make install     - Установить в систему"
-	@echo "  make clean       - Очистить временные файлы"
-	@echo "  make test        - Запустить тесты"
-	@echo "  make run ARGS=...- Запустить с аргументами"
-	@echo "  make deps        - Установить зависимости Go"
-	@echo "  make build-all   - Собрать для всех платформ"
-	@echo "  make package-deb - Создать DEB пакет"
-	@echo "  make package-rpm - Создать RPM пакет"
+	@echo "  make build        - Собрать бинарный файл"
+	@echo "  make install      - Установить в систему"
+	@echo "  make clean        - Очистить временные файлы"
+	@echo "  make test         - Запустить тесты"
+	@echo "  make run ARGS=... - Запустить с аргументами"
+	@echo "  make deps         - Установить зависимости Go"
+	@echo "  make build-all    - Собрать для всех платформ"
+	@echo "  make package-rpm  - Создать RPM пакет"
