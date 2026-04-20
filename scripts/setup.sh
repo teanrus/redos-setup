@@ -13,14 +13,21 @@ NC='\033[0m' # No Color
 # === КОНФИГУРАЦИЯ GITHUB ===
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
+ASSETS_RELEASE_TAG="${ASSETS_RELEASE_TAG:-packages}"
 # Используем latest релиз вместо фиксированной версии
 
 # === ФУНКЦИИ ===
 
 # Функция для получения URL последнего релиза
-get_latest_release_url() {
+get_release_asset_url() {
+    local release_tag=$1
+    local file_name=$2
+    echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$release_tag/$file_name"
+}
+
+get_assets_release_url() {
     local file_name=$1
-    echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$file_name"
+    get_release_asset_url "$ASSETS_RELEASE_TAG" "$file_name"
 }
 
 # Функция для безопасного чтения ввода из терминала
@@ -58,9 +65,19 @@ detect_os_version() {
         OS_MAJOR_VERSION="${BASH_REMATCH[1]}"
     fi
 
-    if [ "$IS_REDOS" -eq 1 ] && [ "$OS_MAJOR_VERSION" = "7" ]; then
-        CRYPTOPRO_SUPPORTED=1
-        VIPNET_SUPPORTED=1
+    if [ "$IS_REDOS" -eq 1 ] && [ -n "$OS_MAJOR_VERSION" ]; then
+        case "$OS_MAJOR_VERSION" in
+            7)
+                CRYPTOPRO_SUPPORTED=1
+                VIPNET_SUPPORTED=1
+                ;;
+            *)
+                if [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+                    CRYPTOPRO_SUPPORTED=1
+                    VIPNET_SUPPORTED=1
+                fi
+                ;;
+        esac
     fi
 }
 
@@ -78,10 +95,10 @@ show_os_compatibility_info() {
     fi
 
     if [ "$OS_MAJOR_VERSION" = "7" ]; then
-        echo -e "${GREEN}Режим совместимости: доступны все штатные компоненты скрипта, включая КриптоПро и ViPNet.${NC}"
+        echo -e "${GREEN}Режим совместимости: доступны все штатные компоненты скрипта, ViPNet устанавливается из пакетов для РЕД ОС 7.x, КриптоПро выводится как отдельная инструкция.${NC}"
     elif [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
         echo -e "${YELLOW}Внимание: скрипт изначально разрабатывался и тестировался для РЕД ОС 7.3.${NC}"
-        echo -e "${YELLOW}Для РЕД ОС $OS_VERSION_ID пакеты КриптоПро и ViPNet из этого скрипта не подходят и будут автоматически исключены из установки.${NC}"
+        echo -e "${YELLOW}Для РЕД ОС $OS_VERSION_ID ViPNet будет устанавливаться из пакетов для РЕД ОС 8+, а КриптоПро рекомендуется ставить отдельно через https://install.kontur.ru.${NC}"
         echo -e "${YELLOW}Остальные компоненты будут предложены к установке как обычно.${NC}"
     else
         echo -e "${YELLOW}Не удалось однозначно определить основную версию РЕД ОС. КриптоПро и ViPNet будут недоступны для безопасности.${NC}"
@@ -108,7 +125,7 @@ is_component_supported() {
 # Функция вывода предупреждения о несовместимости компонента
 warn_component_not_supported() {
     local component_label=$1
-    echo -e "${YELLOW}Пропускаем $component_label: в текущем выпуске скрипта доступны пакеты только для РЕД ОС 7.x, а обнаружена ${OS_NAME}.${NC}"
+    echo -e "${YELLOW}Пропускаем $component_label: компонент недоступен для ${OS_NAME}.${NC}"
 }
 
 # Функция для проверки успешности выполнения команд
@@ -135,12 +152,12 @@ download_from_github() {
     local file_name=$1
     local dest_dir=$2
     
-    local url=$(get_latest_release_url "$file_name")
+    local url=$(get_assets_release_url "$file_name")
     
     echo -e "${BLUE}Загрузка $file_name...${NC}"
     
     if ! curl -s --head -f "$url" > /dev/null 2>&1; then
-        echo -e "${RED}✗ Файл $file_name не найден в последнем релизе${NC}"
+        echo -e "${RED}✗ Файл $file_name не найден в release '$ASSETS_RELEASE_TAG'${NC}"
         return 1
     fi
     
@@ -310,6 +327,14 @@ install_liberation_fonts() {
 }
 
 # Функция выбора версии ViPNet
+vipnet_client_asset() {
+    if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+        echo "vipnetclient-gui_gost_x86-64_5.1.3-8402.rpm"
+    else
+        echo "vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+    fi
+}
+
 select_vipnet_version() {
     if ! is_component_supported "vipnet"; then
         warn_component_not_supported "установку ViPNet"
@@ -323,12 +348,14 @@ select_vipnet_version() {
     
     case $choice in
         1)
+            local client_asset
+            client_asset=$(vipnet_client_asset)
             echo -e "${BLUE}Установка ViPNet Client...${NC}"
-            download_from_github "vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm" "$WORK_DIR"
-            if [ -f "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm" ]; then
-                dnf install -y "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+            download_from_github "$client_asset" "$WORK_DIR"
+            if [ -f "$WORK_DIR/$client_asset" ]; then
+                dnf install -y "$WORK_DIR/$client_asset"
                 check_success "Установка ViPNet Client"
-                rm -f "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+                rm -f "$WORK_DIR/$client_asset"
             else
                 echo -e "${RED}✗ Ошибка загрузки ViPNet Client${NC}"
                 return 1
@@ -336,23 +363,38 @@ select_vipnet_version() {
             ;;
         2)
             echo -e "${BLUE}Установка ViPNet + Деловая почта...${NC}"
-            download_from_github "VipNet-DP.tar.gz" "$WORK_DIR"
-            if [ -f "$WORK_DIR/VipNet-DP.tar.gz" ]; then
-                cd "$WORK_DIR"
-                tar -xzf VipNet-DP.tar.gz
-                cd VipNet-DP
-                for rpm in *.rpm; do
-                    if [ -f "$rpm" ]; then
-                        dnf install -y "$rpm"
-                    fi
-                done
-                cd "$WORK_DIR"
-                rm -rf VipNet-DP
-                rm -f VipNet-DP.tar.gz
-                check_success "Установка ViPNet + Деловая почта"
+            if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+                local client_asset
+                client_asset=$(vipnet_client_asset)
+                download_from_github "$client_asset" "$WORK_DIR"
+                download_from_github "vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm" "$WORK_DIR"
+                if [ -f "$WORK_DIR/$client_asset" ] && [ -f "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm" ]; then
+                    dnf install -y "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
+                    check_success "Установка ViPNet + Деловая почта"
+                    rm -f "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
+                else
+                    echo -e "${RED}✗ Ошибка загрузки пакетов ViPNet для РЕД ОС 8+${NC}"
+                    return 1
+                fi
             else
-                echo -e "${RED}✗ Ошибка загрузки ViPNet-DP.tar.gz${NC}"
-                return 1
+                download_from_github "VipNet-DP.tar.gz" "$WORK_DIR"
+                if [ -f "$WORK_DIR/VipNet-DP.tar.gz" ]; then
+                    cd "$WORK_DIR"
+                    tar -xzf VipNet-DP.tar.gz
+                    cd VipNet-DP
+                    for rpm in *.rpm; do
+                        if [ -f "$rpm" ]; then
+                            dnf install -y "$rpm"
+                        fi
+                    done
+                    cd "$WORK_DIR"
+                    rm -rf VipNet-DP
+                    rm -f VipNet-DP.tar.gz
+                    check_success "Установка ViPNet + Деловая почта"
+                else
+                    echo -e "${RED}✗ Ошибка загрузки ViPNet-DP.tar.gz${NC}"
+                    return 1
+                fi
             fi
             ;;
         *)
@@ -451,43 +493,10 @@ install_cryptopro() {
         return 0
     fi
 
-    if confirm_installation "КриптоПро и дополнительные пакеты"; then
-        echo -e "${GREEN}Установка КриптоПро...${NC}"
-        
-        dnf install -y ifd-rutokens token-manager gostcryptogui caja-gostcryptogui
-        check_success "Установка пакетов для КриптоПро"
-        
-        download_from_github "kriptopror4.tar.gz" "$WORK_DIR"
-        if [ -f "$WORK_DIR/kriptopror4.tar.gz" ]; then
-            cd "$WORK_DIR"
-            tar -xzf kriptopror4.tar.gz
-            
-            # Ищем установочный скрипт в текущей директории (без подкаталога R4)
-            if [ -f "install_gui.sh" ]; then
-                chmod +x install_gui.sh
-                ./install_gui.sh
-                check_success "Установка КриптоПро"
-            elif [ -f "install.sh" ]; then
-                chmod +x install.sh
-                ./install.sh
-                check_success "Установка КриптоПро"
-            else
-                # Если скрипт не найден, пробуем установить все rpm пакеты
-                echo -e "${BLUE}Установка RPM пакетов КриптоПро...${NC}"
-                for rpm in *.rpm; do
-                    if [ -f "$rpm" ]; then
-                        dnf install -y "$rpm"
-                    fi
-                done
-                check_success "Установка КриптоПро (RPM)"
-            fi
-            
-            cd "$WORK_DIR"
-            rm -f kriptopror4.tar.gz
-            # Удаляем распакованные файлы
-            rm -f *.rpm *.sh 2>/dev/null
-            rm -rf linux-amd64_deb 2>/dev/null
-        fi
+    if confirm_installation "инструкцию по установке КриптоПро"; then
+        echo -e "${YELLOW}Автоматическая установка КриптоПро из release отключена.${NC}"
+        echo -e "${BLUE}Рекомендуется устанавливать КриптоПро через https://install.kontur.ru${NC}"
+        echo -e "${BLUE}Кратко: откройте сайт, выберите установку для вашей версии РЕД ОС и выполните шаги мастера Контур.${NC}"
     else
         echo -e "${YELLOW}Пропускаем установку КриптоПро${NC}"
     fi
@@ -576,6 +585,7 @@ detect_os_version
 echo -e "${GREEN}=== Начало настройки РЕД ОС ===${NC}"
 echo -e "${BLUE}Дата запуска: $(date)${NC}"
 echo -e "${BLUE}GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO${NC}"
+echo -e "${BLUE}Packages release: $ASSETS_RELEASE_TAG${NC}"
 show_os_compatibility_info
 echo ""
 

@@ -12,6 +12,7 @@ set -o pipefail
 SCRIPT_VERSION="2.9.0"
 GITHUB_USER="teanrus"
 GITHUB_REPO="redos-setup"
+ASSETS_RELEASE_TAG="${ASSETS_RELEASE_TAG:-packages}"
 
 DEFAULT_WORK_DIR="/home/inst"
 WORK_DIR="$DEFAULT_WORK_DIR"
@@ -157,9 +158,20 @@ ensure_workdir() {
     cd "$WORK_DIR" || die "Не удалось перейти в рабочую директорию: $WORK_DIR"
 }
 
+get_release_asset_url() {
+    local release_tag="$1"
+    local file_name="$2"
+    echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$release_tag/$file_name"
+}
+
 get_latest_release_url() {
     local file_name="$1"
     echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$file_name"
+}
+
+get_assets_release_url() {
+    local file_name="$1"
+    get_release_asset_url "$ASSETS_RELEASE_TAG" "$file_name"
 }
 
 download_from_github() {
@@ -167,7 +179,7 @@ download_from_github() {
     local dest_dir="$2"
     local url
 
-    url=$(get_latest_release_url "$file_name")
+    url=$(get_assets_release_url "$file_name")
     log_info "Загрузка $file_name..."
 
     if [ "$DRY_RUN" -eq 1 ]; then
@@ -176,7 +188,7 @@ download_from_github() {
     fi
 
     if ! curl -s --head -f "$url" >/dev/null 2>&1; then
-        log_error "✗ Файл $file_name не найден в последнем релизе"
+        log_error "✗ Файл $file_name не найден в release '$ASSETS_RELEASE_TAG'"
         return "$EXIT_DOWNLOAD_FAILED"
     fi
 
@@ -231,9 +243,19 @@ detect_os_version() {
         OS_MAJOR_VERSION="${BASH_REMATCH[1]}"
     fi
 
-    if [ "$IS_REDOS" -eq 1 ] && [ "$OS_MAJOR_VERSION" = "7" ]; then
-        CRYPTOPRO_SUPPORTED=1
-        VIPNET_SUPPORTED=1
+    if [ "$IS_REDOS" -eq 1 ] && [ -n "$OS_MAJOR_VERSION" ]; then
+        case "$OS_MAJOR_VERSION" in
+            7)
+                CRYPTOPRO_SUPPORTED=1
+                VIPNET_SUPPORTED=1
+                ;;
+            *)
+                if [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+                    CRYPTOPRO_SUPPORTED=1
+                    VIPNET_SUPPORTED=1
+                fi
+                ;;
+        esac
     fi
 }
 
@@ -257,9 +279,9 @@ EOF
     fi
 
     if [ "$OS_MAJOR_VERSION" = "7" ]; then
-        log_success "Режим совместимости: поддерживается полный сценарий установки."
+        log_success "Режим совместимости: поддерживается полный сценарий установки, ViPNet ставится из пакетов для РЕД ОС 7.x."
     elif [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
-        log_warn "Для РЕД ОС $OS_VERSION_ID пакеты КриптоПро и ViPNet из текущего релиза не подходят и будут пропущены."
+        log_warn "Для РЕД ОС $OS_VERSION_ID ViPNet будет устанавливаться из пакетов для РЕД ОС 8+, а КриптоПро рекомендуется ставить отдельно через https://install.kontur.ru."
     else
         log_warn "Не удалось однозначно определить версию РЕД ОС. Несовместимые компоненты будут заблокированы."
     fi
@@ -291,9 +313,9 @@ component_support_reason() {
     case "$component_name" in
         cryptopro|vipnet)
             if [ "$IS_REDOS" -ne 1 ]; then
-                echo "компонент поддерживается только на РЕД ОС 7.x, а текущая ОС не распознана как РЕД ОС"
-            elif [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
-                echo "в текущем релизе доступны пакеты только для РЕД ОС 7.x, а обнаружена ${OS_NAME}"
+                echo "компонент поддерживается только на РЕД ОС, а текущая ОС не распознана как РЕД ОС"
+            elif [ -z "$OS_MAJOR_VERSION" ]; then
+                echo "не удалось определить основную версию РЕД ОС"
             else
                 echo "компонент недоступен для текущей версии ОС"
             fi
@@ -631,65 +653,67 @@ install_cryptopro() {
 
     confirm_installation "$(component_label cryptopro)" || return 0
 
-    if [ "$DRY_RUN" -eq 1 ]; then
-        log_info "Будут установлены пакеты КриптоПро и зависимости"
-        return 0
-    fi
+    log_warn "Автоматическая установка КриптоПро из release отключена."
+    log_info "Рекомендуется устанавливать КриптоПро через https://install.kontur.ru"
+    log_info "Кратко: откройте сайт, выберите установку для вашей версии РЕД ОС и выполните шаги мастера Контур."
+}
 
-    run_cmd dnf install -y ifd-rutokens token-manager gostcryptogui caja-gostcryptogui || die "Ошибка установки зависимостей КриптоПро"
-    download_from_github "kriptopror4.tar.gz" "$WORK_DIR" || die "Ошибка загрузки КриптоПро" "$EXIT_DOWNLOAD_FAILED"
-    cd "$WORK_DIR" || die "Не удалось перейти в $WORK_DIR"
-    tar -xzf kriptopror4.tar.gz || die "Ошибка распаковки kriptopror4.tar.gz"
-
-    if [ -f "install_gui.sh" ]; then
-        chmod +x install_gui.sh
-        ./install_gui.sh || die "Ошибка запуска install_gui.sh"
-    elif [ -f "install.sh" ]; then
-        chmod +x install.sh
-        ./install.sh || die "Ошибка запуска install.sh"
+vipnet_client_asset() {
+    if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+        echo "vipnetclient-gui_gost_x86-64_5.1.3-8402.rpm"
     else
-        local rpm
-        for rpm in ./*.rpm; do
-            [ -f "$rpm" ] || continue
-            run_cmd dnf install -y "$rpm" || die "Ошибка установки RPM КриптоПро: $rpm"
-        done
+        echo "vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
     fi
-
-    rm -f kriptopror4.tar.gz ./*.rpm ./*.sh 2>/dev/null
-    rm -rf linux-amd64_deb 2>/dev/null
-    log_success "✓ КриптоПро установлен"
 }
 
 install_vipnet_client() {
+    local client_asset
+    client_asset=$(vipnet_client_asset)
+
     if [ "$DRY_RUN" -eq 1 ]; then
-        log_info "Будет установлен ViPNet Client"
+        log_info "Будет установлен ViPNet Client из пакета $client_asset"
         return 0
     fi
 
-    download_from_github "vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm" "$WORK_DIR" || die "Ошибка загрузки ViPNet Client" "$EXIT_DOWNLOAD_FAILED"
-    run_cmd dnf install -y "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm" || die "Ошибка установки ViPNet Client"
-    rm -f "$WORK_DIR/vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+    download_from_github "$client_asset" "$WORK_DIR" || die "Ошибка загрузки ViPNet Client" "$EXIT_DOWNLOAD_FAILED"
+    run_cmd dnf install -y "$WORK_DIR/$client_asset" || die "Ошибка установки ViPNet Client"
+    rm -f "$WORK_DIR/$client_asset"
     log_success "✓ ViPNet Client установлен"
 }
 
 install_vipnet_dp() {
+    local client_asset
+    client_asset=$(vipnet_client_asset)
+
     if [ "$DRY_RUN" -eq 1 ]; then
-        log_info "Будет установлен ViPNet + Деловая почта"
+        if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+            log_info "Будут установлены ViPNet Client и Деловая почта для РЕД ОС 8+"
+        else
+            log_info "Будет установлен ViPNet + Деловая почта"
+        fi
         return 0
     fi
 
-    download_from_github "VipNet-DP.tar.gz" "$WORK_DIR" || die "Ошибка загрузки ViPNet-DP" "$EXIT_DOWNLOAD_FAILED"
-    cd "$WORK_DIR" || die "Не удалось перейти в $WORK_DIR"
-    tar -xzf VipNet-DP.tar.gz || die "Ошибка распаковки ViPNet-DP.tar.gz"
-    cd VipNet-DP || die "Не удалось перейти в каталог VipNet-DP"
-    local rpm
-    for rpm in ./*.rpm; do
-        [ -f "$rpm" ] || continue
-        run_cmd dnf install -y "$rpm" || die "Ошибка установки ViPNet RPM: $rpm"
-    done
-    cd "$WORK_DIR" || die "Не удалось вернуться в $WORK_DIR"
-    rm -rf VipNet-DP
-    rm -f VipNet-DP.tar.gz
+    if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+        download_from_github "$client_asset" "$WORK_DIR" || die "Ошибка загрузки ViPNet Client" "$EXIT_DOWNLOAD_FAILED"
+        download_from_github "vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm" "$WORK_DIR" || die "Ошибка загрузки Деловой почты ViPNet" "$EXIT_DOWNLOAD_FAILED"
+        run_cmd dnf install -y "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm" || die "Ошибка установки ViPNet для РЕД ОС 8+"
+        rm -f "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
+    else
+        download_from_github "VipNet-DP.tar.gz" "$WORK_DIR" || die "Ошибка загрузки ViPNet-DP" "$EXIT_DOWNLOAD_FAILED"
+        cd "$WORK_DIR" || die "Не удалось перейти в $WORK_DIR"
+        tar -xzf VipNet-DP.tar.gz || die "Ошибка распаковки ViPNet-DP.tar.gz"
+        cd VipNet-DP || die "Не удалось перейти в каталог VipNet-DP"
+        local rpm
+        for rpm in ./*.rpm; do
+            [ -f "$rpm" ] || continue
+            run_cmd dnf install -y "$rpm" || die "Ошибка установки ViPNet RPM: $rpm"
+        done
+        cd "$WORK_DIR" || die "Не удалось вернуться в $WORK_DIR"
+        rm -rf VipNet-DP
+        rm -f VipNet-DP.tar.gz
+    fi
+
     log_success "✓ ViPNet + Деловая почта установлены"
 }
 
@@ -1044,6 +1068,7 @@ cmd_interactive() {
     log_info "=== Начало интерактивной настройки РЕД ОС ==="
     log_info "Дата запуска: $(date)"
     log_info "GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO"
+    log_info "Packages release: $ASSETS_RELEASE_TAG"
     show_os_compatibility_info
     echo ""
 
