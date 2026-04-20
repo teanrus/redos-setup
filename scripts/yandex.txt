@@ -1,0 +1,12 @@
+﻿# ункция установки Яндекс раузера
+install_yandex_browser() {
+    if ! rpm -q yandex-browser-release &>/dev/null; then
+        echo -e "${BLUE}становка репозитория Яндекс раузера...${NC}"
+        dnf install -y yandex-browser-release
+        check_success "становка репозитория Яндекс раузера"
+    fi
+    echo -e "${BLUE}становка Яндекс раузера...${NC}"
+    dnf install -y yandex-browser-stable
+    check_success "становка Яндекс раузера"
+}
+

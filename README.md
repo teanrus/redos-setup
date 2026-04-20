@@ -486,5 +486,3 @@ Copyright (c) 2025 teanrus
 - Релизы: <https://github.com/teanrus/redos-setup/releases>
 - Исходный код: <https://github.com/teanrus/redos-setup>
 - Контакт: [tyanrv@lbt.yanao.ru](mailto:tyanrv@lbt.yanao.ru)
-
-
