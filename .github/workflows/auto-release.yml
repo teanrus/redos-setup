@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, master]
     paths:
-      - 'scripts/setup.sh'
+      - 'scripts/*.sh'
       - 'README.md'
       - 'CHANGELOG.md'
       - '.github/workflows/auto-release.yml'
@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   publish-setup-script:
-    name: Publish setup.sh to Release
+    name: Publish scripts to Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -44,8 +44,21 @@ jobs:
       - name: Prepare release assets
         run: |
           mkdir -p release-assets
-          cp scripts/setup.sh release-assets/setup.sh
-          sha256sum release-assets/setup.sh | awk '{print $1 "  setup.sh"}' > release-assets/setup.sh.sha256
+
+          found=0
+          for script in scripts/*.sh; do
+            [ -f "$script" ] || continue
+            found=1
+
+            filename=$(basename "$script")
+            cp "$script" "release-assets/$filename"
+            sha256sum "release-assets/$filename" | awk -v name="$filename" '{print $1 "  " name}' > "release-assets/${filename}.sha256"
+          done
+
+          if [ "$found" -ne 1 ]; then
+            echo "No shell scripts found in scripts/"
+            exit 1
+          fi
 
           echo "Prepared assets:"
           ls -la release-assets
@@ -58,8 +71,22 @@ jobs:
             echo ""
             echo "| File | Description |"
             echo "| :--- | :---------- |"
-            echo "| \`setup.sh\` | Main installation script for RED OS workstations |"
-            echo "| \`setup.sh.sha256\` | SHA256 checksum for integrity verification |"
+
+            for asset in release-assets/*.sh; do
+              [ -f "$asset" ] || continue
+              filename=$(basename "$asset")
+              if [ "$filename" = "setup.sh" ]; then
+                description="Classic interactive installation script"
+              elif [ "$filename" = "setup_cli.sh" ]; then
+                description="CLI-oriented installation script with commands and flags"
+              else
+                description="Shell script from scripts/ directory"
+              fi
+
+              echo "| \`$filename\` | $description |"
+              echo "| \`${filename}.sha256\` | SHA256 checksum for integrity verification |"
+            done
+
             echo ""
             echo "## Quick start"
             echo ""
@@ -74,6 +101,18 @@ jobs:
             echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh.sha256'
             echo 'sha256sum -c setup.sh.sha256'
             echo '```'
+            if [ -f release-assets/setup_cli.sh ]; then
+              echo ""
+              echo "## CLI quick start"
+              echo ""
+              echo '```bash'
+              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup_cli.sh'
+              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup_cli.sh.sha256'
+              echo 'sha256sum -c setup_cli.sh.sha256'
+              echo 'chmod +x setup_cli.sh'
+              echo 'sudo ./setup_cli.sh help'
+              echo '```'
+            fi
             echo ""
             echo "## Notes"
             echo ""
@@ -96,9 +135,7 @@ jobs:
           draft: false
           prerelease: ${{ steps.version.outputs.tag == 'latest' }}
           generate_release_notes: false
-          files: |
-            release-assets/setup.sh
-            release-assets/setup.sh.sha256
+          files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
