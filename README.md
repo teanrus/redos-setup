@@ -4,7 +4,7 @@
 
 [![Version](https://img.shields.io/badge/version-2.9-green?style=for-the-badge)](https://github.com/teanrus/redos-setup/releases)
 [![License](https://img.shields.io/badge/license-MIT-blue?style=for-the-badge)](LICENSE)
-[![РЕД ОС](https://img.shields.io/badge/РЕД%20ОС-7.x%20%2F%208%2B-red?style=for-the-badge&logo=linux)](https://redos.red-soft.ru/)
+[![РЕД ОС](https://img.shields.io/badge/%D0%A0%D0%95%D0%94%20%D0%9E%D0%A1-7.x%20%2F%208%2B-red?style=for-the-badge&logo=linux)](https://redos.red-soft.ru/)
 [![GitHub Releases](https://img.shields.io/github/downloads/teanrus/redos-setup/total?style=for-the-badge&logo=github&color=blue)](https://github.com/teanrus/redos-setup/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/teanrus/redos-setup?style=for-the-badge&logo=github&color=yellow)](https://github.com/teanrus/redos-setup/stargazers)
 
@@ -66,10 +66,12 @@
 curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh | sudo bash
 ```
 
-Запуск с предварительным сохранением файла:
+Скачивание файла из последнего релиза с проверкой контрольной суммы SHA256:
 
 ```bash
-wget https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh.sha256
+sha256sum -c setup.sh.sha256
 chmod +x setup.sh
 sudo ./setup.sh
 ```
@@ -78,15 +80,20 @@ sudo ./setup.sh
 
 ```bash
 curl -L -o setup.sh https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
+curl -L -o setup.sh.sha256 https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh.sha256
+sha256sum -c setup.sh.sha256
 chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-Запуск нового CLI из репозитория:
+Запуск нового CLI из последнего релиза и проверка контрольной суммы:
 
 ```bash
-chmod +x scripts/setup_cli.sh
-sudo ./scripts/setup_cli.sh help
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/setup_cli.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/setup_cli.sh.sha256
+sha256sum -c setup_cli.sh.sha256
+chmod +x setup_cli.sh
+sudo ./setup_cli.sh help
 ```
 
 ## CLI
