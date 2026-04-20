@@ -76,16 +76,6 @@ chmod +x setup.sh
 sudo ./setup.sh
 ```
 
-Если `wget` отсутствует:
-
-```bash
-curl -L -o setup.sh https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh
-curl -L -o setup.sh.sha256 https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh.sha256
-sha256sum -c setup.sh.sha256
-chmod +x setup.sh
-sudo ./setup.sh
-```
-
 Запуск нового CLI из последнего релиза и проверка контрольной суммы:
 
 ```bash
@@ -398,6 +388,7 @@ sudo ./scripts/setup_cli.sh interactive
 ### В неинтерактивном режиме (флаг --yes)
 
 При запуске с флагом `--yes`:
+
 - Если SELinux в режиме enforcing: скрипт выбирает режим **permissive**
 - Если SELinux в режиме disabled: скрипт оставляет его отключенным
 
@@ -435,20 +426,24 @@ sudo restorecon -Rv /opt/app
 ## Особенности отдельных компонентов
 
 Telegram:
+
 - Распаковывается в `/opt/telegram`
 - Создаётся символическая ссылка `/usr/bin/telegram`
 - Добавляется ярлык в меню приложений
 
 Шрифты Liberation:
+
 - Устанавливаются в `/usr/share/fonts/liberation`
 - После установки выполняется `fc-cache -fv`
 
 КриптоПро:
+
 - Автоматическая установка из release отключена
 - Скрипт выводит рекомендацию устанавливать КриптоПро через `https://install.kontur.ru`
 - На сайте Контур можно выбрать установку под нужную версию РЕД ОС и выполнить шаги мастера
 
 ViPNet:
+
 - На `РЕД ОС 7.x` Client-версия устанавливается из `vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm`
 - На `РЕД ОС 7.x` DP-версия устанавливается из архива `VipNet-DP.tar.gz`
 - На `РЕД ОС 8+` Client-версия устанавливается из `vipnetclient-gui_gost_x86-64_5.1.3-8402.rpm`
@@ -508,6 +503,6 @@ Copyright (c) 2025 teanrus
 
 ## Поддержка
 
-- Релизы: https://github.com/teanrus/redos-setup/releases
-- Исходный код: https://github.com/teanrus/redos-setup
+- Релизы: <https://github.com/teanrus/redos-setup/releases>
+- Исходный код: <https://github.com/teanrus/redos-setup>
 - Контакт: [tyanrv@lbt.yanao.ru](mailto:tyanrv@lbt.yanao.ru)
