@@ -1,9 +1,0 @@
-﻿# ункция обновления системы
-update_system() {
-    echo -e "${BLUE}бновление системы...${NC}"
-    dnf clean all
-    dnf makecache
-    dnf update -y
-    check_success "бновление системы"
-}
-
