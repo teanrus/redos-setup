@@ -1,9 +1,25 @@
 #!/bin/bash
-set -o pipefail
+##############################################################################
+# setup_cli.sh — CLI-интерфейс для настройки РЕД ОС
+#
+# Описание:
+#   Командная строка для автоматизированной настройки РЕД ОС.
+#   Предоставляет интерфейс командной строки для установки компонентов,
+#   управления конфигурацией и выполнения задач настройки системы.
+#
+# Использование:
+#   ./setup_cli.sh [опции] [команды]
+#
+# Опции:
+#   -h, --help          Показать справку
+#   -v, --version       Показать версию
+#   --dry-run           Симуляция выполнения без изменений
+#
+# Зависимости: bash, dnf, curl, wget, coreutils
+# Опционально: unzip, rpm, tar
+##############################################################################
 
-# ============================================================
-# redos-setup CLI
-# ============================================================
+set -euo pipefail
 
 # ------------------------------
 # 1. Metadata and globals
@@ -285,7 +301,7 @@ EOF
     if [ "$OS_MAJOR_VERSION" = "7" ]; then
         log_success "Режим совместимости: поддерживается полный сценарий установки, ViPNet ставится из пакетов для РЕД ОС 7.x."
     elif [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
-        log_warn "Для РЕД ОС $OS_VERSION_ID ViPNet будет устанавливаться из пакетов для РЕД ОС 8+, а КриптоПро рекомендуется ставить отдельно через https://install.kontur.ru."
+        log_warn "Для РЕД ОС $OS_VERSION_ID ViPNet будет устанавливаться из пакетов для РЕД ОС 8+."
     else
         log_warn "Не удалось однозначно определить версию РЕД ОС. Несовместимые компоненты будут заблокированы."
     fi
@@ -897,18 +913,6 @@ install_kaspersky() {
     log_success "✓ Kaspersky Agent установлен"
 }
 
-install_cryptopro() {
-    if ! is_component_supported "cryptopro"; then
-        die "$(component_support_reason cryptopro)" "$EXIT_COMPONENT_UNSUPPORTED"
-    fi
-
-    confirm_installation "$(component_label cryptopro)" || return 0
-
-    log_warn "Автоматическая установка КриптоПро из release отключена."
-    log_info "Рекомендуется устанавливать КриптоПро через https://install.kontur.ru"
-    log_info "Кратко: откройте сайт, выберите установку для вашей версии РЕД ОС и выполните шаги мастера Контур."
-}
-
 vipnet_client_asset() {
     if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
         echo "vipnetclient-gui_gost_x86-64_5.1.3-8402.rpm"
@@ -1084,8 +1088,6 @@ component_label() {
         telegram) echo "Telegram" ;;
         messengers) echo "группу мессенджеров" ;;
         kaspersky) echo "Kaspersky Agent" ;;
-        cryptopro) echo "КриптоПро" ;;
-        vipnet) echo "ViPNet" ;;
         1c) echo "1С:Предприятие" ;;
         trim) echo "TRIM для SSD" ;;
         grub) echo "обновление GRUB" ;;
@@ -1143,7 +1145,6 @@ run_component_install() {
         telegram) install_telegram ;;
         messengers) install_messengers_group ;;
         kaspersky) install_kaspersky ;;
-        cryptopro) install_cryptopro ;;
         vipnet) install_vipnet ;;
         1c) install_1c ;;
         trim) setup_trim ;;
@@ -1336,11 +1337,6 @@ cmd_interactive() {
     install_chromium_gost
     install_messengers_group
     install_kaspersky
-    if is_component_supported "cryptopro"; then
-        install_cryptopro
-    else
-        warn_component_not_supported "cryptopro"
-    fi
     if is_component_supported "vipnet"; then
         DIRECT_INSTALL_MODE=0
         install_vipnet
