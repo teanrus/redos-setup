@@ -37,6 +37,10 @@ IS_REDOS=0
 CRYPTOPRO_SUPPORTED=0
 VIPNET_SUPPORTED=0
 
+SELINUX_MODE="unknown"
+MANAGE_SELINUX_POLICIES=0
+INSTALLED_APPS=()
+
 EXIT_OK=0
 EXIT_ERROR=1
 EXIT_USAGE=2
@@ -400,15 +404,261 @@ disable_selinux_if_needed() {
         return 0
     fi
 
-    if grep -q '^SELINUX=enforcing' /etc/selinux/config 2>/dev/null; then
-        log_info "Отключение SELinux..."
-        if [ "$DRY_RUN" -eq 1 ]; then
-            echo "[dry-run] sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config"
+    local selinux_current=$(grep '^SELINUX=' /etc/selinux/config 2>/dev/null | cut -d= -f2)
+    
+    # Если SELinux отключен, предлагаем его включить
+    if [ "$selinux_current" = "disabled" ]; then
+        log_warn "Обнаружен SELinux в режиме disabled (отключен)"
+        
+        if [ "$NON_INTERACTIVE" -eq 1 ]; then
+            # В неинтерактивном режиме оставляем как есть
+            log_info "SELinux остаётся отключен (неинтерактивный режим)"
             return 0
+        else
+            # В интерактивном режиме спрашиваем пользователя
+            echo -e "${YELLOW}=== Включение SELinux ===${NC}"
+            echo "SELinux в настоящее время отключен (disabled). Рекомендуется его включить для безопасности."
+            echo "Доступные варианты:"
+            echo "1. Включить SELinux в режиме enforcing (самый безопасный)"
+            echo "2. Включить SELinux в режиме permissive (логирует нарушения, но не блокирует)"
+            echo "3. Оставить SELinux отключенным (disabled)"
+            local choice
+            choice=$(read_from_terminal "${YELLOW}Выберите вариант (1, 2 или 3):${NC}")
+            
+            case "$choice" in
+                1)
+                    _set_selinux_enforcing
+                    ;;
+                2)
+                    _set_selinux_permissive_from_disabled
+                    ;;
+                3)
+                    log_info "SELinux остаётся отключенным."
+                    ;;
+                *)
+                    log_warn "Неверный выбор. SELinux остаётся без изменений."
+                    ;;
+            esac
         fi
-        sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config || die "Ошибка отключения SELinux"
-        log_success "✓ SELinux переведён в disabled"
+    elif [ "$selinux_current" = "enforcing" ]; then
+        log_warn "Обнаружен SELinux в режиме enforcing"
+        
+        if [ "$NON_INTERACTIVE" -eq 1 ]; then
+            # В неинтерактивном режиме выбираем режим permissive (более безопасно)
+            log_info "Переведение SELinux в режим permissive (неинтерактивный режим)..."
+            _set_selinux_permissive
+        else
+            # В интерактивном режиме спрашиваем пользователя
+            echo -e "${YELLOW}=== Настройка SELinux ===${NC}"
+            echo "SELinux в настоящее время активирован (enforcing). Доступные варианты:"
+            echo "1. Оставить SELinux в режиме enforcing (самый безопасный, но может потребоваться добавление правил)"
+            echo "2. Перевести SELinux в режим permissive (логирует нарушения, но не блокирует)"
+            echo "3. Отключить SELinux полностью (disabled) - НЕ рекомендуется"
+            local choice
+            choice=$(read_from_terminal "${YELLOW}Выберите вариант (1, 2 или 3):${NC}")
+            
+            case "$choice" in
+                1)
+                    log_info "SELinux остаётся в режиме enforcing. Рекомендуется использовать 'semanage' для добавления необходимых правил."
+                    _print_selinux_help
+                    ;;
+                2)
+                    _set_selinux_permissive
+                    ;;
+                3)
+                    _set_selinux_disabled
+                    ;;
+                *)
+                    log_warn "Неверный выбор. SELinux остаётся без изменений."
+                    ;;
+            esac
+        fi
     fi
+}
+
+_set_selinux_permissive() {
+    log_info "Переведение SELinux в режим permissive..."
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] sed -i 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config"
+        return 0
+    fi
+    sed -i 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config || die "Ошибка переведения SELinux в permissive"
+    log_success "✓ SELinux переведён в режим permissive"
+    log_info "Требуется перезагрузка для применения изменений. Используйте: sudo reboot"
+}
+
+_set_selinux_disabled() {
+    log_warn "Отключение SELinux..."
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config"
+        return 0
+    fi
+    sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config || die "Ошибка отключения SELinux"
+    log_success "✓ SELinux отключен (disabled)"
+    log_info "Требуется перезагрузка для полного применения изменений. Используйте: sudo reboot"
+}
+
+_set_selinux_enforcing() {
+    log_info "Включение SELinux в режим enforcing..."
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] sed -i 's/SELINUX=disabled/SELINUX=enforcing/' /etc/selinux/config"
+        return 0
+    fi
+    sed -i 's/SELINUX=disabled/SELINUX=enforcing/' /etc/selinux/config || die "Ошибка включения SELinux в enforcing"
+    log_success "✓ SELinux включен в режим enforcing"
+    log_warn "Требуется перезагрузка для применения изменений. Используйте: sudo reboot"
+    log_info "После перезагрузки система будет работать с SELinux в режиме enforcing (рекомендуется использовать semanage для добавления необходимых правил)"
+    _print_selinux_help
+}
+
+_set_selinux_permissive_from_disabled() {
+    log_info "Включение SELinux в режим permissive..."
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] sed -i 's/SELINUX=disabled/SELINUX=permissive/' /etc/selinux/config"
+        return 0
+    fi
+    sed -i 's/SELINUX=disabled/SELINUX=permissive/' /etc/selinux/config || die "Ошибка включения SELinux в permissive"
+    log_success "✓ SELinux включен в режим permissive"
+    log_info "Требуется перезагрузка для применения изменений. Используйте: sudo reboot"
+    log_info "В режиме permissive SELinux логирует нарушения, но не блокирует приложения"
+}
+
+_print_selinux_help() {
+    cat << 'EOF'
+
+=== Справка по управлению SELinux правилами ===
+
+Если во время установки приложений появляются ошибки SELinux, используйте:
+
+1. Просмотр логов нарушений:
+   sudo tail -f /var/log/audit/audit.log
+
+2. Анализ нарушений:
+   sudo sealert -l "*"
+
+3. Автоматическое создание и применение правил:
+   sudo audit2allow -a -M app_policy
+   sudo semodule -i app_policy.pp
+
+4. Добавление правила для конкретного сценария:
+   sudo semanage fcontext -a -t user_home_t "/opt/app(/.*)?"; 
+   sudo restorecon -Rv /opt/app
+
+Дополнительная информация: https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/
+
+EOF
+}
+
+# ============ SELinux Policy Management ============
+
+check_selinux_status() {
+    if [ ! -f /etc/selinux/config ]; then
+        SELINUX_MODE="disabled"
+        return 0
+    fi
+    
+    if getenforce >/dev/null 2>&1; then
+        SELINUX_MODE=$(getenforce)
+        return 0
+    fi
+    
+    SELINUX_MODE="unknown"
+    return 0
+}
+
+add_selinux_policy_for_app() {
+    local app_name="$1"
+    local app_path="$2"
+    
+    if [ "$SELINUX_MODE" != "enforcing" ] && [ "$SELINUX_MODE" != "permissive" ]; then
+        log_verbose "SELinux не активирован, пропускаю добавление политик для $app_name"
+        return 0
+    fi
+    
+    if [ ! -x "semanage" ]; then
+        log_verbose "semanage не установлен, пропускаю добавление политик"
+        return 0
+    fi
+    
+    log_verbose "Добавление SELinux политик для $app_name в $app_path"
+    
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] semanage fcontext -a -t user_home_t \"$app_path(/.*)?\""
+        echo "[dry-run] restorecon -Rv $app_path"
+        return 0
+    fi
+    
+    # Добавляем контекст для исполняемых файлов
+    semanage fcontext -a -t user_home_t "$app_path(/.*)?" 2>/dev/null || true
+    
+    # Применяем контекст
+    restorecon -Rv "$app_path" 2>/dev/null || true
+}
+
+apply_selinux_audit2allow() {
+    if [ "$SELINUX_MODE" != "enforcing" ] && [ "$SELINUX_MODE" != "permissive" ]; then
+        log_verbose "SELinux не активирован, пропускаю применение политик"
+        return 0
+    fi
+    
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] audit2allow -l -a"
+        return 0
+    fi
+    
+    if ! command -v audit2allow >/dev/null 2>&1; then
+        log_verbose "audit2allow не установлен"
+        return 0
+    fi
+    
+    log_verbose "Применение SELinux политик из audit2allow..."
+    
+    # Проверяем есть ли нарушения
+    if audit2allow -a -C 2>/dev/null | grep -q "AVC"; then
+        log_info "Обнаружены нарушения SELinux, создаю политики..."
+        audit2allow -a -M redos_setup 2>/dev/null || true
+        
+        if [ -f redos_setup.pp ]; then
+            semodule -i redos_setup.pp 2>/dev/null && log_success "✓ Политики SELinux применены" || true
+            rm -f redos_setup.pp redos_setup.mod 2>/dev/null || true
+        fi
+    else
+        log_verbose "Нарушений SELinux не обнаружено"
+    fi
+}
+
+track_installed_app() {
+    local app_name="$1"
+    local app_path="$2"
+    
+    INSTALLED_APPS+=("$app_name:$app_path")
+    log_verbose "Отслеживаю приложение: $app_name в $app_path"
+}
+
+apply_policies_for_all_apps() {
+    local i
+    local app_name
+    local app_path
+    
+    if [ "$SELINUX_MODE" = "disabled" ]; then
+        log_verbose "SELinux отключен, политики не применяются"
+        return 0
+    fi
+    
+    if [ ${#INSTALLED_APPS[@]} -eq 0 ]; then
+        log_verbose "Нет отслеживаемых приложений"
+        return 0
+    fi
+    
+    log_info "Применение SELinux политик для установленных приложений..."
+    
+    for i in "${!INSTALLED_APPS[@]}"; do
+        IFS=':' read -r app_name app_path <<< "${INSTALLED_APPS[$i]}"
+        add_selinux_policy_for_app "$app_name" "$app_path"
+    done
+    
+    # Применяем политики из audit2allow если доступно
+    apply_selinux_audit2allow
 }
 
 configure_dnf() {
@@ -616,6 +866,7 @@ install_telegram() {
     chmod +x /usr/share/applications/telegram.desktop || die "Ошибка chmod для telegram.desktop"
     rm -rf Telegram
     rm -f tsetup.tar.xz
+    track_installed_app "Telegram" "/opt/telegram"
     log_success "✓ Telegram установлен"
 }
 
@@ -775,6 +1026,9 @@ install_1c() {
         ./fix.sh || die "Ошибка запуска fix.sh"
         cd "$WORK_DIR" || die "Не удалось вернуться в $WORK_DIR"
         rm -rf lin_8_3_24_1691
+        # Отслеживаем установку 1С
+        [ -d /opt/1C ] && track_installed_app "1C:Enterprise" "/opt/1C"
+        [ -d /usr/lib1cv8 ] && track_installed_app "1C:Enterprise" "/usr/lib1cv8"
         log_success "✓ 1С установлена"
     else
         die "Каталог с файлами 1С не найден после распаковки"
@@ -1042,6 +1296,7 @@ cmd_install() {
     component_exists "$component" || die "Неизвестный компонент: $component" "$EXIT_USAGE"
 
     detect_os_version
+    check_selinux_status
     DIRECT_INSTALL_MODE=1
 
     prepare_runtime
@@ -1058,10 +1313,14 @@ cmd_install() {
     fi
 
     run_component_install "$component"
+    
+    # Применяем SELinux политики для установленных приложений
+    apply_policies_for_all_apps
 }
 
 cmd_interactive() {
     detect_os_version
+    check_selinux_status
     prepare_runtime
     prepare_system_defaults
 
@@ -1093,6 +1352,9 @@ cmd_interactive() {
     update_grub
     setup_ksg
 
+    # Применяем SELinux политики для всех установленных приложений
+    apply_policies_for_all_apps
+    
     log_success "=== Настройка завершена ==="
 }
 
