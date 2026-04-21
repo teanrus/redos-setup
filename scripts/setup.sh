@@ -32,7 +32,6 @@ ASSETS_RELEASE_TAG="${ASSETS_RELEASE_TAG:-packages}"
 # === ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ===
 OS_MAJOR_VERSION=""
 IS_REDOS=0
-SELINUX_MODE="unknown"
 WORK_DIR="/home/inst"
 
 # === ФУНКЦИИ ===
