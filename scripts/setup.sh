@@ -41,6 +41,80 @@ get_release_asset_url() {
     echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/$release_tag/$file_name"
 }
 
+# --- Новые функции установки отдельных компонентов ---
+install_yandex_browser() {
+    if confirm_installation "Яндекс.Браузер"; then
+        if ! rpm -q yandex-browser-release &>/dev/null; then
+            dnf install -y yandex-browser-release
+            check_success "Установка репозитория Яндекс.Браузера"
+        fi
+        if ! rpm -q yandex-browser-stable &>/dev/null; then
+            dnf install -y yandex-browser-stable
+            check_success "Установка Яндекс.Браузера"
+        else
+            echo -e "${YELLOW}Яндекс.Браузер уже установлен${NC}"
+        fi
+    fi
+}
+
+install_r7_office() {
+    if confirm_installation "R7 Office"; then
+        if ! rpm -q r7-release &>/dev/null; then
+            dnf install -y r7-release
+            check_success "Установка репозитория r7-release"
+        fi
+        if ! rpm -q r7-office &>/dev/null; then
+            dnf install -y r7-office
+            check_success "Установка R7 Office"
+        else
+            echo -e "${YELLOW}R7 Office уже установлен${NC}"
+        fi
+    fi
+}
+
+install_max() {
+    if confirm_installation "MAX Desktop"; then
+        if [ ! -f /etc/yum.repos.d/max.repo ]; then
+            cat > /etc/yum.repos.d/max.repo << 'EOF'
+[max]
+name=MAX Desktop
+baseurl=https://download.max.ru/linux/rpm/el/9/x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://download.max.ru/linux/rpm/public.asc
+sslverify=1
+metadata_expire=300
+EOF
+            rpm --import https://download.max.ru/linux/rpm/public.asc
+            check_success "Установка репозитория MAX"
+        fi
+        if ! rpm -q max &>/dev/null; then
+            dnf install -y max
+            check_success "Установка MAX"
+        else
+            echo -e "${YELLOW}MAX уже установлен${NC}"
+        fi
+    fi
+}
+
+install_sreda() {
+    if confirm_installation "корпоративный мессенджер Среда"; then
+        if ! rpm -q sreda &>/dev/null; then
+            download_from_github "sreda.rpm" "$WORK_DIR"
+            if [ -f "$WORK_DIR/sreda.rpm" ]; then
+                dnf install -y "$WORK_DIR/sreda.rpm"
+                check_success "Установка Среда"
+                rm -f "$WORK_DIR/sreda.rpm"
+            else
+                echo -e "${RED}Не удалось загрузить пакет Среда${NC}"
+            fi
+        else
+            echo -e "${YELLOW}Среда уже установлена${NC}"
+        fi
+    fi
+}
+
 get_assets_release_url() {
     local file_name=$1
     get_release_asset_url "$ASSETS_RELEASE_TAG" "$file_name"
@@ -652,12 +726,12 @@ install_chromium_gost() {
 
 # Функция установки мессенджеров
 install_messengers() {
-    # СРЕДА
-    if confirm_installation "корпоративный мессенджер СРЕДА"; then
+    # Среда
+    if confirm_installation "корпоративный мессенджер Среда"; then
         download_from_github "sreda.rpm" "$WORK_DIR"
         if [ -f "$WORK_DIR/sreda.rpm" ]; then
             dnf install -y "$WORK_DIR/sreda.rpm"
-            check_success "Установка СРЕДА"
+            check_success "Установка Среда"
             rm -f "$WORK_DIR/sreda.rpm"
         fi
     fi
@@ -720,21 +794,7 @@ install_kaspersky() {
     fi
 }
 
-# Функция установки КриптоПро
-install_cryptopro() {
-    if ! is_component_supported "cryptopro"; then
-        warn_component_not_supported "установку КриптоПро"
-        return 0
-    fi
 
-    if confirm_installation "инструкцию по установке КриптоПро"; then
-        echo -e "${YELLOW}Автоматическая установка КриптоПро из release отключена.${NC}"
-        echo -e "${BLUE}Рекомендуется устанавливать КриптоПро через https://install.kontur.ru${NC}"
-        echo -e "${BLUE}Кратко: откройте сайт, выберите установку для вашей версии РЕД ОС и выполните шаги мастера Контур.${NC}"
-    else
-        echo -e "${YELLOW}Пропускаем установку КриптоПро${NC}"
-    fi
-}
 
 # Функция установки 1С
 install_1c() {
@@ -849,12 +909,19 @@ check_success "Создание рабочей директории"
 check_command "wget"
 check_command "curl"
 
-# === УСТАНОВКА БАЗОВОЙ СИСТЕМЫ ===
-if confirm_installation "базовую систему (репозитории, ядро, r7-office, Яндекс.Браузер, MAX, системные утилиты)"; then
+
+# === УСТАНОВКА ОСНОВНЫХ КОМПОНЕНТОВ ===
+if confirm_installation "основные компоненты (обновление системы, ядро, доп. пакеты)"; then
     install_base_system
 else
-    echo -e "${YELLOW}Пропускаем установку базовой системы${NC}"
+    echo -e "${YELLOW}Пропускаем установку основных компонентов${NC}"
 fi
+
+# --- Вынесенные из основного блока ---
+install_yandex_browser
+install_r7_office
+install_max
+install_sreda
 
 # === ВЫБОР ДОПОЛНИТЕЛЬНЫХ ПРОГРАММ ===
 echo -e "${GREEN}=== Выбор дополнительных программ для установки ===${NC}"
@@ -873,8 +940,7 @@ install_messengers
 # Kaspersky Agent
 install_kaspersky
 
-# КриптоПро
-install_cryptopro
+
 
 # ViPNet (с выбором версии)
 if is_component_supported "vipnet" && confirm_installation "ViPNet"; then
@@ -911,7 +977,7 @@ echo ""
 # Вывод списка установленных программ
 echo -e "${GREEN}Установленные компоненты:${NC}"
 command -v chromium-gost >/dev/null 2>&1 && echo "  ✓ Chromium-GOST"
-command -v sreda >/dev/null 2>&1 && echo "  ✓ СРЕДА"
+command -v sreda >/dev/null 2>&1 && echo "  ✓ Среда"
 command -v vk-messenger >/dev/null 2>&1 && echo "  ✓ VK Messenger"
 command -v telegram >/dev/null 2>&1 && echo "  ✓ Telegram"
 [ -d /usr/share/fonts/liberation ] && echo "  ✓ Шрифты Liberation"
