@@ -1,4 +1,6 @@
 ﻿#!/bin/bash
+
+##############################################################################
 # setup.sh — Автоматизированная настройка РЕД ОС
 #
 # Описание:
@@ -437,24 +439,100 @@ handle_selinux() {
     local selinux_current
     selinux_current=$(grep '^SELINUX=' /etc/selinux/config | cut -d= -f2)
     
+    # Если SELinux отключен, предлагаем включить
     if [ "$selinux_current" = "disabled" ]; then
         echo -e "${YELLOW}=== Включение SELinux ===${NC}"
-        echo "1. Включить SELinux в режиме enforcing"
-        echo "2. Включить SELinux в режиме permissive"
-        echo "3. Оставить SELinux отключенным"
+        echo "SELinux в настоящее время отключен (disabled). Рекомендуется его включить для безопасности."
+        echo "Доступные варианты:"
+        echo "1. Включить SELinux в режиме enforcing (самый безопасный)"
+        echo "2. Включить SELinux в режиме permissive (логирует нарушения, но не блокирует)"
+        echo "3. Оставить SELinux отключенным (disabled)"
+        
         local answer
         answer=$(read_from_terminal "${YELLOW}Выберите вариант (1, 2 или 3):${NC}")
+        
         case "$answer" in
-            1) sed -i 's/SELINUX=disabled/SELINUX=enforcing/' /etc/selinux/config
-               echo -e "${YELLOW}Требуется перезагрузка.${NC}"
-               print_selinux_help ;;
-            2) sed -i 's/SELINUX=disabled/SELINUX=permissive/' /etc/selinux/config
-               echo -e "${YELLOW}Требуется перезагрузка.${NC}" ;;
-            3) echo -e "${GREEN}✓ SELinux остаётся отключенным${NC}" ;;
+            1)
+                sed -i 's/SELINUX=disabled/SELINUX=enforcing/' /etc/selinux/config
+                echo -e "${GREEN}✓ SELinux будет включён в режиме enforcing после перезагрузки${NC}"
+                echo -e "${YELLOW}Требуется перезагрузка для применения изменений.${NC}"
+                print_selinux_help
+                ;;
+            2)
+                sed -i 's/SELINUX=disabled/SELINUX=permissive/' /etc/selinux/config
+                echo -e "${GREEN}✓ SELinux будет включён в режиме permissive после перезагрузки${NC}"
+                echo -e "${YELLOW}Требуется перезагрузка для применения изменений.${NC}"
+                ;;
+            3)
+                echo -e "${GREEN}✓ SELinux остаётся отключенным${NC}"
+                ;;
+            *)
+                echo -e "${YELLOW}Неверный выбор. SELinux остаётся без изменений.${NC}"
+                ;;
         esac
     elif [ "$selinux_current" = "enforcing" ]; then
-        echo -e "${GREEN}✓ SELinux в режиме enforcing${NC}"
-        print_selinux_help
+        # === ИНТЕРАКТИВНЫЙ ВЫБОР ДЛЯ РЕЖИМА ENFORCING ===
+        echo -e "${YELLOW}=== Настройка SELinux ===${NC}"
+        echo "SELinux в настоящее время активирован (enforcing). Доступные варианты:"
+        echo "1. Оставить SELinux в режиме enforcing (самый безопасный, но может потребоваться добавление правил)"
+        echo "2. Перевести SELinux в режим permissive (логирует нарушения, но не блокирует)"
+        echo "3. Отключить SELinux полностью (disabled) - НЕ рекомендуется"
+        
+        local answer
+        answer=$(read_from_terminal "${YELLOW}Выберите вариант (1, 2 или 3):${NC}")
+        
+        case "$answer" in
+            1)
+                echo -e "${GREEN}✓ SELinux остаётся в режиме enforcing${NC}"
+                print_selinux_help
+                ;;
+            2)
+                echo -e "${BLUE}Переведение SELinux в режим permissive...${NC}"
+                sed -i 's/SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config
+                check_success "Перевод SELinux в режим permissive"
+                echo -e "${YELLOW}Требуется перезагрузка для применения изменений. Используйте: sudo reboot${NC}"
+                ;;
+            3)
+                echo -e "${YELLOW}Отключение SELinux...${NC}"
+                sed -i 's/SELINUX=enforcing/SELINUX=disabled/' /etc/selinux/config
+                check_success "Отключение SELinux"
+                echo -e "${YELLOW}Требуется перезагрузка для полного применения изменений. Используйте: sudo reboot${NC}"
+                ;;
+            *)
+                echo -e "${YELLOW}Неверный выбор. SELinux остаётся без изменений.${NC}"
+                ;;
+        esac
+    elif [ "$selinux_current" = "permissive" ]; then
+        echo -e "${YELLOW}=== Настройка SELinux ===${NC}"
+        echo "SELinux в настоящее время в режиме permissive. Доступные варианты:"
+        echo "1. Перевести SELinux в режим enforcing (рекомендуется)"
+        echo "2. Оставить SELinux в режиме permissive"
+        echo "3. Отключить SELinux полностью (disabled)"
+        
+        local answer
+        answer=$(read_from_terminal "${YELLOW}Выберите вариант (1, 2 или 3):${NC}")
+        
+        case "$answer" in
+            1)
+                echo -e "${BLUE}Переведение SELinux в режим enforcing...${NC}"
+                sed -i 's/SELINUX=permissive/SELINUX=enforcing/' /etc/selinux/config
+                check_success "Перевод SELinux в режим enforcing"
+                echo -e "${YELLOW}Требуется перезагрузка для применения изменений.${NC}"
+                print_selinux_help
+                ;;
+            2)
+                echo -e "${GREEN}✓ SELinux остаётся в режиме permissive${NC}"
+                ;;
+            3)
+                echo -e "${YELLOW}Отключение SELinux...${NC}"
+                sed -i 's/SELINUX=permissive/SELINUX=disabled/' /etc/selinux/config
+                check_success "Отключение SELinux"
+                echo -e "${YELLOW}Требуется перезагрузка для полного применения изменений.${NC}"
+                ;;
+            *)
+                echo -e "${YELLOW}Неверный выбор. SELinux остаётся без изменений.${NC}"
+                ;;
+        esac
     fi
 }
 
