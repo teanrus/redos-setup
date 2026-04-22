@@ -814,13 +814,8 @@ setup_trim
 setup_ksg
 
 # Опционально: настройка времени и авт-обновлений
-if confirm_installation "выполнить настройку времени (timedate) сейчас"; then
-    setup_timedate
-fi
-
-if confirm_installation "выполнить настройку автоматического обновления сейчас"; then
-    setup_auto_update
-fi
+setup_timedate
+setup_auto_update
 
 # === ЗАВЕРШЕНИЕ ===
 echo -e "${GREEN}=== Настройка завершена! ===${NC}"
