@@ -20,16 +20,19 @@
 
 Скрипт использует модель ленивой загрузки: файл скачивается из GitHub Releases только в момент установки и удаляется после завершения шага.
 
-Проект сейчас включает два сценария запуска:
+Проект сейчас включает три сценария запуска:
 
 - `scripts/setup.sh` - исходный интерактивный сценарий установки;
 - `scripts/setup_cli.sh` - новый CLI-интерфейс с командами `help`, `list`, `check-os`, `install`, `doctor`, `interactive`.
+- `scripts/redos_workstation_setup_tool.sh` - расширенный интерактивный сценарий для рабочих станций с дополнительными системными настройками.
 
 ## Какой файл использовать
 
 Используйте `scripts/setup.sh`, если нужен классический пошаговый интерактивный сценарий, где скрипт сам последовательно задаёт вопросы по компонентам.
 
 Используйте `scripts/setup_cli.sh`, если нужен более управляемый интерфейс с командами и флагами: для точечной установки компонентов, `dry-run`, неинтерактивного запуска и дальнейшей автоматизации.
+
+Используйте `scripts/redos_workstation_setup_tool.sh`, если помимо установки ПО нужно сразу выполнить настройку рабочей станции: часовой пояс, `chrony`, автоматические обновления, TRIM, KSG и базовые изменения SELinux.
 
 ## Возможности
 
@@ -40,6 +43,9 @@
 - Установка пакетов через `dnf` и vendor-архивы из GitHub Releases
 - Проверка совместимости `ViPNet` с установленной версией РЕД ОС
 - Отдельный CLI-режим через `scripts/setup_cli.sh`
+- Расширенный интерактивный режим для рабочих станций через `scripts/redos_workstation_setup_tool.sh`
+- Настройка времени и `chrony` с выбором часового пояса и NTP-серверов
+- Настройка автоматических обновлений через `systemd timer`
 
 ## Совместимость
 
@@ -63,7 +69,14 @@
 Запуск напрямую из последнего релиза:
 
 ```bash
+# классический пошаговый интерактивный сценарий
 curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/setup.sh | sudo bash
+
+# более управляемый интерфейс с командами и флагами
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/setup_cli | sudo bash
+
+# расширенный пошаговый интерактивный сценарий
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh | sudo bash
 ```
 
 Скачивание файла из последнего релиза с проверкой контрольной суммы SHA256:
@@ -84,6 +97,16 @@ curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/setup_c
 sha256sum -c setup_cli.sh.sha256
 chmod +x setup_cli.sh
 sudo ./setup_cli.sh help
+```
+
+Запуск workstation tool из репозитория:
+
+```bash
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh.sha256
+sha256sum -c redos_workstation_setup_tool.sh.sha256
+chmod +x redos_workstation_setup_tool.sh
+sudo ./redos_workstation_setup_tool.sh
 ```
 
 ## CLI
@@ -191,6 +214,31 @@ sudo ./scripts/setup_cli.sh interactive
 | `--variant VALUE` | Выбрать вариант установки, например для `vipnet` |
 | `--no-color` | Отключить цветной вывод |
 | `--json` | JSON-вывод для `check-os` |
+
+## Workstation Tool
+
+Файл `scripts/redos_workstation_setup_tool.sh` предназначен для интерактивной подготовки рабочей станции РЕД ОС. В отличие от `setup.sh`, он охватывает не только установку ПО, но и ряд эксплуатационных настроек, которые обычно выполняются после развёртывания системы.
+
+Что умеет сценарий:
+
+- обновлять систему и, для РЕД ОС 7.x, предлагать обновление ядра через `redos-kernels6`;
+- устанавливать прикладное ПО: Яндекс.Браузер, R7 Office, MAX, Среда, Chromium-GOST, Liberation Fonts, Kaspersky Agent, ViPNet, 1С;
+- настраивать TRIM для SSD и конфигурацию моноблока KSG;
+- управлять режимом SELinux в интерактивном режиме;
+- настраивать время: выбор часового пояса, отключение встроенного NTP, установка и конфигурация `chrony`, ожидание синхронизации;
+- настраивать автоматические обновления через `redos-auto-update`, `systemd service` и `systemd timer`;
+- предлагать перезагрузку после завершения настройки.
+
+Пример запуска:
+
+```bash
+sudo ./scripts/redos_workstation_setup_tool.sh
+```
+
+Минимальные зависимости, указанные в самом сценарии:
+
+- `bash`, `dnf`, `curl`, `wget`, `coreutils`;
+- опционально: `unzip`, `rpm`, `tar`.
 
 ## Требования
 
@@ -463,6 +511,7 @@ ViPNet:
 ## Документация проекта
 
 - [README.md](README.md) - обзор проекта, совместимость, установка и описание поведения
+- [scripts/redos_workstation_setup_tool.sh](scripts/redos_workstation_setup_tool.sh) - расширенный интерактивный сценарий подготовки рабочей станции
 - [CONTRIBUTING.md](CONTRIBUTING.md) - правила и рекомендации для изменений в репозитории
 - [CHANGELOG.md](CHANGELOG.md) - заметные изменения по релизам и в `Unreleased`
 - [SECURITY.md](SECURITY.md) - краткая политика по поддерживаемым версиям и сообщениям об уязвимостях
