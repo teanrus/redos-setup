@@ -75,10 +75,10 @@ jobs:
             for asset in release-assets/*.sh; do
               [ -f "$asset" ] || continue
               filename=$(basename "$asset")
-              if [ "$filename" = "setup.sh" ]; then
-                description="Classic interactive installation script"
-              elif [ "$filename" = "setup_cli.sh" ]; then
-                description="CLI-oriented installation script with commands and flags"
+              if [ "$filename" = "redos_workstation_setup_tool_cli.sh" ]; then
+                description="CLI-oriented workstation setup script with commands and flags"
+              elif [ "$filename" = "redos_workstation_setup_tool.sh" ]; then
+                description="Interactive workstation setup script"
               else
                 description="Shell script from scripts/ directory"
               fi
@@ -91,26 +91,26 @@ jobs:
             echo "## Quick start"
             echo ""
             echo '```bash'
-            echo 'curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh | sudo bash'
+            echo 'curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh | sudo bash'
             echo '```'
             echo ""
             echo "## Verify checksum"
             echo ""
             echo '```bash'
-            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh'
-            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup.sh.sha256'
-            echo 'sha256sum -c setup.sh.sha256'
+            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
+            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
+            echo 'sha256sum -c redos_workstation_setup_tool_cli.sh.sha256'
             echo '```'
-            if [ -f release-assets/setup_cli.sh ]; then
+            if [ -f release-assets/redos_workstation_setup_tool_cli.sh ]; then
               echo ""
               echo "## CLI quick start"
               echo ""
               echo '```bash'
-              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup_cli.sh'
-              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/setup_cli.sh.sha256'
-              echo 'sha256sum -c setup_cli.sh.sha256'
-              echo 'chmod +x setup_cli.sh'
-              echo 'sudo ./setup_cli.sh help'
+              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
+              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
+              echo 'sha256sum -c redos_workstation_setup_tool_cli.sh.sha256'
+              echo 'chmod +x redos_workstation_setup_tool_cli.sh'
+              echo 'sudo ./redos_workstation_setup_tool_cli.sh help'
               echo '```'
             fi
             echo ""

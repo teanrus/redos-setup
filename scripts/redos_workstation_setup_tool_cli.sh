@@ -1,6 +1,6 @@
 #!/bin/bash
 ##############################################################################
-# setup_cli.sh — CLI-интерфейс для настройки РЕД ОС
+# redos_workstation_setup_tool_cli.sh — CLI-интерфейс для настройки РЕД ОС
 #
 # Описание:
 #   Командная строка для автоматизированной настройки РЕД ОС.
@@ -8,7 +8,7 @@
 #   управления конфигурацией и выполнения задач настройки системы.
 #
 # Использование:
-#   ./setup_cli.sh [опции] [команды]
+#   ./redos_workstation_setup_tool_cli.sh [опции] [команды]
 #
 # Опции:
 #   -h, --help          Показать справку
@@ -32,6 +32,36 @@ ASSETS_RELEASE_TAG="${ASSETS_RELEASE_TAG:-packages}"
 
 DEFAULT_WORK_DIR="/home/inst"
 WORK_DIR="$DEFAULT_WORK_DIR"
+
+# --- Timedate configuration ---
+NTP_SERVERS="ntp1.vniiftri.ru ntp2.vniiftri.ru ntp21.vniiftri.ru"
+declare -a TZ_NAMES=(
+    "Калининград (UTC+2)"
+    "Москва (UTC+3)"
+    "Самара (UTC+4)"
+    "Екатеринбург (UTC+5)"
+    "Омск (UTC+6)"
+    "Красноярск (UTC+7)"
+    "Иркутск (UTC+8)"
+    "Якутск (UTC+9)"
+    "Владивосток (UTC+10)"
+    "Магадан (UTC+11)"
+    "Камчатка (UTC+12)"
+)
+
+declare -a TZ_VALUES=(
+    "Europe/Kaliningrad"
+    "Europe/Moscow"
+    "Europe/Samara"
+    "Asia/Yekaterinburg"
+    "Asia/Omsk"
+    "Asia/Krasnoyarsk"
+    "Asia/Irkutsk"
+    "Asia/Yakutsk"
+    "Asia/Vladivostok"
+    "Asia/Magadan"
+    "Asia/Kamchatka"
+)
 
 COMMAND=""
 TARGET_COMPONENT=""
@@ -192,6 +222,31 @@ get_latest_release_url() {
 get_assets_release_url() {
     local file_name="$1"
     get_release_asset_url "$ASSETS_RELEASE_TAG" "$file_name"
+}
+
+get_installed_kernel_packages() {
+    local image_path
+    local package_name
+    local -a kernel_packages=()
+
+    shopt -s nullglob
+    for image_path in /boot/vmlinuz-*; do
+        if [[ "$image_path" == *"/vmlinuz-0-rescue-"* ]]; then
+            continue
+        fi
+
+        package_name=$(rpm -qf "$image_path" --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' 2>/dev/null || true)
+        if [ -n "$package_name" ]; then
+            kernel_packages+=("$package_name")
+        fi
+    done
+    shopt -u nullglob
+
+    if [ ${#kernel_packages[@]} -eq 0 ]; then
+        return 1
+    fi
+
+    printf '%s\n' "${kernel_packages[@]}" | sort -u
 }
 
 download_from_github() {
@@ -392,12 +447,12 @@ doctor_network() {
 
 doctor_release_urls() {
     local url
-    url=$(get_latest_release_url "setup.sh")
+    url=$(get_latest_release_url "redos_workstation_setup_tool_cli.sh")
 
     if curl -s --head -f "$url" >/dev/null 2>&1; then
-        log_success "release asset setup.sh: ok"
+        log_success "release asset redos_workstation_setup_tool_cli.sh: ok"
     else
-        log_warn "release asset setup.sh: не найден"
+        log_warn "release asset redos_workstation_setup_tool_cli.sh: не найден"
     fi
 }
 
@@ -739,32 +794,269 @@ EOF
 }
 
 # ------------------------------
-# 7. Installers: base system
+# 7. Installers: workstation parity
 # ------------------------------
 
-install_base_system() {
-    confirm_installation "$(component_label base)" || return 0
+install_updates() {
+    confirm_installation "$(component_label update-system)" || return 0
 
-    log_info "=== Установка базовой системы ==="
-
+    log_info "=== Обновление системы ==="
     run_cmd dnf clean all || die "Ошибка очистки кэша DNF"
     run_cmd dnf makecache || die "Ошибка обновления кэша DNF"
     run_cmd dnf update -y || die "Ошибка обновления системы"
+    log_success "✓ Обновление системы выполнено"
+}
 
-    run_cmd dnf install -y r7-release || die "Ошибка установки r7-release"
-    run_cmd dnf install -y yandex-browser-release || die "Ошибка установки yandex-browser-release"
+install_kernel() {
+    if [ "$IS_REDOS" -ne 1 ] || [ "$OS_MAJOR_VERSION" != "7" ]; then
+        log_warn "Обновление ядра через redos-kernels6 доступно только на РЕД ОС 7.x"
+        return 0
+    fi
+
+    confirm_installation "$(component_label kernel)" || return 0
+
+    log_info "=== Обновление ядра ==="
+    if ! rpm -q redos-kernels6-release >/dev/null 2>&1; then
+        run_cmd dnf install -y redos-kernels6-release || die "Ошибка установки репозитория redos-kernels6"
+    fi
+
+    run_cmd dnf update -y || die "Ошибка обновления после подключения redos-kernels6"
+
+    if confirm_installation "$(component_label grub) после установки ядра"; then
+        local kernel_count
+        local -a kernel_pkgs=()
+        mapfile -t kernel_pkgs < <(get_installed_kernel_packages | sort -V || true)
+        kernel_count=${#kernel_pkgs[@]}
+
+        if [ "$kernel_count" -gt 3 ]; then
+            local k
+            local -a kernels_to_remove=( "${kernel_pkgs[@]:0:$((kernel_count - 3))}" )
+            for k in "${kernels_to_remove[@]}"; do
+                run_cmd dnf remove -y "$k" || die "Ошибка удаления старого ядра: $k"
+            done
+        fi
+
+        update_grub
+    fi
+
+    log_success "✓ Обновление ядра выполнено"
+}
+
+install_yandex_browser() {
+    confirm_installation "$(component_label yandex-browser)" || return 0
+
+    if rpm -q yandex-browser-stable >/dev/null 2>&1; then
+        log_success "✓ Яндекс.Браузер уже установлен"
+        return 0
+    fi
+
+    if ! ls /etc/yum.repos.d/yandex-browser*.repo >/dev/null 2>&1 && ! rpm -q yandex-browser-release >/dev/null 2>&1; then
+        run_cmd dnf install -y yandex-browser-release || log_warn "Не удалось установить yandex-browser-release, продолжаю попытку установки браузера"
+    fi
+
+    run_cmd dnf install -y yandex-browser-stable || die "Ошибка установки Яндекс.Браузера"
+    log_success "✓ Яндекс.Браузер установлен"
+}
+
+install_r7_office() {
+    confirm_installation "$(component_label r7-office)" || return 0
+
+    if rpm -q r7-office >/dev/null 2>&1; then
+        log_success "✓ R7 Office уже установлен"
+        return 0
+    fi
+
+    if ! rpm -q r7-release >/dev/null 2>&1; then
+        run_cmd dnf install -y r7-release || die "Ошибка установки репозитория R7"
+    fi
+
+    run_cmd dnf install -y r7-office || die "Ошибка установки R7 Office"
+    log_success "✓ R7 Office установлен"
+}
+
+install_max() {
+    confirm_installation "$(component_label max)" || return 0
+
+    if rpm -q max >/dev/null 2>&1; then
+        log_success "✓ MAX уже установлен"
+        return 0
+    fi
 
     write_max_repo || die "Ошибка создания репозитория MAX"
     run_cmd rpm --import https://download.max.ru/linux/rpm/public.asc || die "Ошибка импорта ключа MAX"
-
-    run_cmd dnf makecache || die "Ошибка обновления кэша репозиториев"
-    run_cmd dnf install -y redos-kernels6-release || die "Ошибка установки redos-kernels6-release"
-    run_cmd dnf update -y || die "Ошибка финального обновления"
-
-    run_cmd dnf install -y pavucontrol r7-office yandex-browser-stable sshfs pinta perl-Getopt-Long perl-File-Copy || die "Ошибка установки базовых пакетов"
     run_cmd dnf install -y max || die "Ошибка установки MAX"
+    log_success "✓ MAX установлен"
+}
 
-    log_success "✓ Базовая система установлена"
+timedate_select_timezone() {
+    echo ""
+    log_info "[Выбор часового пояса]"
+    local i
+    for i in "${!TZ_NAMES[@]}"; do
+        echo "  $((i + 1)). ${TZ_NAMES[$i]}"
+    done
+    echo ""
+
+    local choice
+    while true; do
+        choice=$(read_from_terminal "Выберите номер часового пояса [2]: ")
+        choice=${choice:-2}
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#TZ_NAMES[@]}" ]; then
+            echo "$choice"
+            return 0
+        fi
+        log_warn "Неверный выбор. Введите число от 1 до ${#TZ_NAMES[@]}"
+    done
+}
+
+timedate_wait_for_sync() {
+    confirm_installation "ожидание синхронизации времени (до ~30 секунд)" || {
+        log_warn "Пропуск ожидания синхронизации"
+        return 0
+    }
+
+    local i
+    local status
+    echo "Ожидание синхронизации времени (до 30 секунд)..."
+    for i in {1..6}; do
+        sleep 5
+        status=$(chronyc tracking 2>/dev/null | grep "Leap status" | awk -F': ' '{print $2}' | xargs || true)
+        if [ "$status" = "Normal" ]; then
+            log_success "✓ Синхронизация времени выполнена"
+            return 0
+        fi
+        echo "  Попытка $i/6..."
+    done
+
+    log_warn "Синхронизация не завершена. Проверьте позже: chronyc tracking"
+}
+
+setup_timedate() {
+    confirm_installation "$(component_label timedate)" || return 0
+
+    local selected_tz
+    selected_tz=$(timedate_select_timezone)
+    local tz_index=$((selected_tz - 1))
+    local timezone="${TZ_VALUES[$tz_index]}"
+
+    run_cmd timedatectl set-timezone "$timezone" || die "Ошибка установки часового пояса"
+    run_cmd timedatectl set-ntp false || die "Ошибка отключения текущего NTP"
+    run_cmd dnf install -y chrony || die "Ошибка установки chrony"
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] write /etc/chrony.conf"
+    else
+        cp /etc/chrony.conf "/etc/chrony.conf.backup.$(date +%Y%m%d_%H%M%S)" 2>/dev/null || true
+        cat > /etc/chrony.conf << EOF
+# Серверы точного времени ВНИИФТРИ (Stratum-1, Россия)
+$(echo "$NTP_SERVERS" | tr ' ' '\n' | sed 's/^/server /; s/$/ iburst maxsources 4/')
+
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+logdir /var/log/chrony
+log measurements statistics tracking
+keyfile /etc/chrony.keys
+EOF
+    fi
+
+    run_cmd systemctl enable chronyd || die "Ошибка включения chronyd"
+    run_cmd systemctl restart chronyd || die "Ошибка перезапуска chronyd"
+    [ "$DRY_RUN" -eq 1 ] || timedate_wait_for_sync
+    log_success "✓ Настройка времени выполнена"
+}
+
+setup_auto_update() {
+    confirm_installation "$(component_label auto-update)" || return 0
+
+    local conf_file="/etc/redos-auto-update.conf"
+    local wrapper_script="/usr/local/bin/redos-auto-update"
+    local service_file="/etc/systemd/system/redos-auto-update.service"
+    local timer_file="/etc/systemd/system/redos-auto-update.timer"
+    local start_time end_time mode period
+
+    start_time=$(read_from_terminal "Время начала окна обновлений [12:30]: ")
+    start_time=${start_time:-12:30}
+    end_time=$(read_from_terminal "Время окончания окна обновлений [14:00]: ")
+    end_time=${end_time:-14:00}
+    mode=$(read_from_terminal "Режим (security/full/check-only) [security]: ")
+    mode=${mode:-security}
+    period=$(read_from_terminal "Период (daily или OnCalendar spec) [daily]: ")
+    period=${period:-daily}
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] write $conf_file"
+        echo "[dry-run] write $wrapper_script"
+        echo "[dry-run] write $service_file"
+        echo "[dry-run] write $timer_file"
+        echo "[dry-run] systemctl daemon-reload"
+        echo "[dry-run] systemctl enable --now redos-auto-update.timer"
+        return 0
+    fi
+
+    cat > "$conf_file" << EOF
+# Конфиг redos-auto-update
+START_TIME="$start_time"
+END_TIME="$end_time"
+MODE="$mode"
+PERIOD="$period"
+EOF
+    chmod 600 "$conf_file"
+
+    cat > "$wrapper_script" << 'EOF'
+#!/bin/bash
+CONF_FILE="/etc/redos-auto-update.conf"
+LOG_FILE="/var/log/redos-auto-update.log"
+source /etc/redos-auto-update.conf
+now=$(date +"%H:%M")
+time_to_minutes(){ h=${1%%:*}; m=${1##*:}; echo $((10#$h*60+10#$m)); }
+if [ $(time_to_minutes "$now") -lt $(time_to_minutes "$START_TIME") ] || [ $(time_to_minutes "$now") -gt $(time_to_minutes "$END_TIME") ]; then
+  echo "Outside window, exit" >> "$LOG_FILE"
+  exit 0
+fi
+echo "Run update: $(date)" >> "$LOG_FILE"
+dnf makecache -q
+count=$(dnf check-update -q 2>/dev/null | grep -c "^[a-z]" || echo 0)
+echo "Updates: $count" >> "$LOG_FILE"
+if [ "$count" -gt 0 ]; then
+  if [ "$MODE" = "full" ]; then
+    dnf upgrade -y >> "$LOG_FILE" 2>&1
+  elif [ "$MODE" = "security" ]; then
+    dnf upgrade --security -y >> "$LOG_FILE" 2>&1
+  fi
+fi
+EOF
+    chmod +x "$wrapper_script"
+
+    cat > "$service_file" << EOF
+[Unit]
+Description=RED OS Automatic Update
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$wrapper_script
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > "$timer_file" << EOF
+[Unit]
+Description=RED OS Automatic Update Timer
+
+[Timer]
+OnCalendar=$period
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target
+EOF
+
+    systemctl daemon-reload || true
+    systemctl enable --now redos-auto-update.timer || true
+    log_success "✓ Автоматическое обновление настроено"
 }
 
 # ------------------------------
@@ -1062,13 +1354,21 @@ setup_ksg() {
 }
 
 # ------------------------------
-# 10. Component registry
+# 11a. Workstation-compatible overrides
 # ------------------------------
+
+install_base_system() {
+    confirm_installation "$(component_label base)" || return 0
+    log_info "=== Базовая подготовка системы ==="
+    install_updates
+    install_kernel
+    log_success "✓ Базовая подготовка системы выполнена"
+}
 
 component_exists() {
     local component="$1"
     case "$component" in
-        base|liberation-fonts|chromium-gost|sreda|vk-messenger|telegram|messengers|kaspersky|cryptopro|vipnet|1c|trim|grub|ksg|all)
+        base|update-system|kernel|yandex-browser|r7-office|max|liberation-fonts|chromium-gost|sreda|vk-messenger|telegram|messengers|kaspersky|vipnet|1c|trim|grub|ksg|timedate|auto-update|all)
             return 0
             ;;
         *)
@@ -1081,17 +1381,25 @@ component_label() {
     local component="$1"
     case "$component" in
         base) echo "базовую систему" ;;
+        update-system) echo "обновление системы" ;;
+        kernel) echo "обновление ядра для РЕД ОС 7.x" ;;
+        yandex-browser) echo "Яндекс.Браузер" ;;
+        r7-office) echo "R7 Office" ;;
+        max) echo "MAX" ;;
         liberation-fonts) echo "шрифты Liberation" ;;
         chromium-gost) echo "Chromium-GOST" ;;
-        sreda) echo "СРЕДА" ;;
+        sreda) echo "Среда" ;;
         vk-messenger) echo "VK Messenger" ;;
         telegram) echo "Telegram" ;;
         messengers) echo "группу мессенджеров" ;;
         kaspersky) echo "Kaspersky Agent" ;;
+        vipnet) echo "ViPNet" ;;
         1c) echo "1С:Предприятие" ;;
         trim) echo "TRIM для SSD" ;;
         grub) echo "обновление GRUB" ;;
         ksg) echo "настройку для моноблока KSG" ;;
+        timedate) echo "настройку времени и chrony" ;;
+        auto-update) echo "настройку автоматического обновления" ;;
         all) echo "все совместимые компоненты" ;;
         *) echo "$component" ;;
     esac
@@ -1101,21 +1409,21 @@ component_group() {
     local component="$1"
     case "$component" in
         base) echo "base" ;;
-        liberation-fonts|chromium-gost|sreda|vk-messenger|telegram|messengers|kaspersky|cryptopro|vipnet|1c) echo "apps" ;;
-        trim|grub|ksg) echo "system" ;;
+        update-system|kernel|trim|grub|ksg|timedate|auto-update) echo "system" ;;
+        yandex-browser|r7-office|max|liberation-fonts|chromium-gost|sreda|vk-messenger|telegram|messengers|kaspersky|vipnet|1c) echo "apps" ;;
         all) echo "meta" ;;
         *) echo "unknown" ;;
     esac
 }
 
-component_requires_variant() {
-    local component="$1"
-    [ "$component" = "vipnet" ]
-}
-
 list_all_components() {
     cat << 'EOF'
 base
+update-system
+kernel
+yandex-browser
+r7-office
+max
 liberation-fonts
 chromium-gost
 sreda
@@ -1123,12 +1431,13 @@ vk-messenger
 telegram
 messengers
 kaspersky
-cryptopro
 vipnet
 1c
 trim
 grub
 ksg
+timedate
+auto-update
 all
 EOF
 }
@@ -1138,6 +1447,11 @@ run_component_install() {
 
     case "$component" in
         base) install_base_system ;;
+        update-system) install_updates ;;
+        kernel) install_kernel ;;
+        yandex-browser) install_yandex_browser ;;
+        r7-office) install_r7_office ;;
+        max) install_max ;;
         liberation-fonts) install_liberation_fonts ;;
         chromium-gost) install_chromium_gost ;;
         sreda) install_sreda ;;
@@ -1150,6 +1464,8 @@ run_component_install() {
         trim) setup_trim ;;
         grub) update_grub ;;
         ksg) setup_ksg ;;
+        timedate) setup_timedate ;;
+        auto-update) setup_auto_update ;;
         all) install_all_compatible ;;
         *) die "Неизвестный компонент: $component" "$EXIT_USAGE" ;;
     esac
@@ -1166,37 +1482,44 @@ install_all_compatible() {
         fi
     done << 'EOF'
 base
+update-system
+kernel
+yandex-browser
+r7-office
+max
 liberation-fonts
 chromium-gost
 sreda
 vk-messenger
 telegram
 kaspersky
-cryptopro
 vipnet
 1c
 trim
 grub
 ksg
+timedate
+auto-update
 EOF
 }
 
-# ------------------------------
-# 11. Command handlers
-# ------------------------------
+component_requires_variant() {
+    local component="$1"
+    [ "$component" = "vipnet" ]
+}
 
 cmd_help() {
     cat << 'EOF'
 redos-setup - CLI для настройки рабочих мест на РЕД ОС
 
 Usage:
-  setup_cli.sh help
-  setup_cli.sh version
-  setup_cli.sh check-os
-  setup_cli.sh list [--compatible]
-  setup_cli.sh install <component> [options]
-  setup_cli.sh doctor
-  setup_cli.sh interactive
+  redos_workstation_setup_tool_cli.sh help
+  redos_workstation_setup_tool_cli.sh version
+  redos_workstation_setup_tool_cli.sh check-os
+  redos_workstation_setup_tool_cli.sh list [--compatible]
+  redos_workstation_setup_tool_cli.sh install <component> [options]
+  redos_workstation_setup_tool_cli.sh doctor
+  redos_workstation_setup_tool_cli.sh interactive
 
 Commands:
   help
@@ -1212,10 +1535,15 @@ Commands:
   doctor
       Выполнить базовую диагностику среды
   interactive
-      Запустить интерактивный сценарий, близкий к текущему setup.sh
+      Запустить workstation-сценарий в стиле redos_workstation_setup_tool.sh
 
 Components:
   base
+  update-system
+  kernel
+  yandex-browser
+  r7-office
+  max
   liberation-fonts
   chromium-gost
   sreda
@@ -1223,12 +1551,13 @@ Components:
   telegram
   messengers
   kaspersky
-  cryptopro
   vipnet
   1c
   trim
   grub
   ksg
+  timedate
+  auto-update
   all
 
 Global options:
@@ -1250,44 +1579,6 @@ cmd_version() {
 cmd_check_os() {
     detect_os_version
     show_os_compatibility_info
-}
-
-cmd_list() {
-    local compatible_only=0
-    local component
-
-    if [ "${REMAINING_ARGS[0]:-}" = "--compatible" ]; then
-        compatible_only=1
-    fi
-
-    detect_os_version
-
-    while IFS= read -r component; do
-        if [ "$compatible_only" -eq 1 ] && ! is_component_supported "$component"; then
-            continue
-        fi
-
-        printf '%-18s | %-10s | %s\n' \
-            "$component" \
-            "$(component_group "$component")" \
-            "$(component_label "$component")"
-    done << 'EOF'
-base
-liberation-fonts
-chromium-gost
-sreda
-vk-messenger
-telegram
-messengers
-kaspersky
-cryptopro
-vipnet
-1c
-trim
-grub
-ksg
-all
-EOF
 }
 
 cmd_install() {
@@ -1314,9 +1605,29 @@ cmd_install() {
     fi
 
     run_component_install "$component"
-    
-    # Применяем SELinux политики для установленных приложений
     apply_policies_for_all_apps
+}
+
+cmd_list() {
+    local compatible_only=0
+    local component
+
+    if [ "${REMAINING_ARGS[0]:-}" = "--compatible" ]; then
+        compatible_only=1
+    fi
+
+    detect_os_version
+
+    while IFS= read -r component; do
+        if [ "$compatible_only" -eq 1 ] && ! is_component_supported "$component"; then
+            continue
+        fi
+
+        printf '%-18s | %-10s | %s\n' \
+            "$component" \
+            "$(component_group "$component")" \
+            "$(component_label "$component")"
+    done < <(list_all_components)
 }
 
 cmd_interactive() {
@@ -1325,17 +1636,19 @@ cmd_interactive() {
     prepare_runtime
     prepare_system_defaults
 
-    log_info "=== Начало интерактивной настройки РЕД ОС ==="
+    log_info "=== Начало настройки РЕД ОС ==="
     log_info "Дата запуска: $(date)"
-    log_info "GitHub: https://github.com/$GITHUB_USER/$GITHUB_REPO"
-    log_info "Packages release: $ASSETS_RELEASE_TAG"
     show_os_compatibility_info
     echo ""
 
-    install_base_system
-    install_liberation_fonts
+    install_updates
+    install_kernel
+    install_yandex_browser
+    install_r7_office
+    install_max
+    install_sreda
     install_chromium_gost
-    install_messengers_group
+    install_liberation_fonts
     install_kaspersky
     if is_component_supported "vipnet"; then
         DIRECT_INSTALL_MODE=0
@@ -1345,12 +1658,11 @@ cmd_interactive() {
     fi
     install_1c
     setup_trim
-    update_grub
     setup_ksg
-
-    # Применяем SELinux политики для всех установленных приложений
+    setup_timedate
+    setup_auto_update
     apply_policies_for_all_apps
-    
+
     log_success "=== Настройка завершена ==="
 }
 
@@ -1460,3 +1772,6 @@ main() {
 }
 
 main "$@"
+
+
+
