@@ -891,6 +891,7 @@ install_max() {
 timedate_select_timezone() {
     echo ""
     log_info "[Выбор часового пояса]"
+    log_info "Можно ввести номер из списка или смещение UTC, например +5."
     local i
     for i in "${!TZ_NAMES[@]}"; do
         echo "  $((i + 1)). ${TZ_NAMES[$i]}"
@@ -905,7 +906,16 @@ timedate_select_timezone() {
             echo "$choice"
             return 0
         fi
-        log_warn "Неверный выбор. Введите число от 1 до ${#TZ_NAMES[@]}"
+
+        if [[ "$choice" =~ ^\+([0-9]+)$ ]]; then
+            local offset="${BASH_REMATCH[1]}"
+            if [ "$offset" -ge 2 ] && [ "$offset" -le 12 ]; then
+                echo "$((offset - 1))"
+                return 0
+            fi
+        fi
+
+        log_warn "Неверный выбор. Введите номер от 1 до ${#TZ_NAMES[@]} или смещение UTC (+2…+12)"
     done
 }
 
@@ -920,7 +930,10 @@ timedate_wait_for_sync() {
     echo "Ожидание синхронизации времени (до 30 секунд)..."
     for i in {1..6}; do
         sleep 5
-        status=$(chronyc tracking 2>/dev/null | grep "Leap status" | awk -F': ' '{print $2}' | xargs || true)
+        status=$(chronyc tracking 2>/dev/null | awk -F': ' '/Leap status/ {print $2}' | xargs || true)
+        if [ -z "$status" ]; then
+            status=$(chronyc tracking 2>/dev/null | awk -F': ' '/Статус прыжка/ {print $2}' | xargs || true)
+        fi
         if [ "$status" = "Normal" ]; then
             log_success "✓ Синхронизация времени выполнена"
             return 0

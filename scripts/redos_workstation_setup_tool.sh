@@ -96,6 +96,7 @@ confirm_installation() {
 # ======================== Timedate ========================
 timedate_select_timezone() {
     echo -e "${BLUE}[Выбор часового пояса]${NC}"
+    echo "Можно ввести номер из списка или смещение UTC, например +5."
     echo ""
     for i in "${!TZ_NAMES[@]}"; do
         echo "  $((i+1)). ${TZ_NAMES[$i]}"
@@ -105,12 +106,21 @@ timedate_select_timezone() {
     while true; do
         choice=$(read_from_terminal "Выберите номер часового пояса [2]: ")
         choice=${choice:-2}
+
         if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 1 ] && [ "$choice" -le "${#TZ_NAMES[@]}" ]; then
             SELECTED_TZ=$choice
             break
-        else
-            echo -e "${RED}Неверный выбор. Введите число от 1 до ${#TZ_NAMES[@]}${NC}"
         fi
+
+        if [[ "$choice" =~ ^\+([0-9]+)$ ]]; then
+            local offset="${BASH_REMATCH[1]}"
+            if [ "$offset" -ge 2 ] && [ "$offset" -le 12 ]; then
+                SELECTED_TZ=$((offset - 1))
+                break
+            fi
+        fi
+
+        echo -e "${RED}Неверный выбор. Введите номер от 1 до ${#TZ_NAMES[@]} или смещение UTC (+2…+12)${NC}"
     done
     echo ""
 }
@@ -170,7 +180,10 @@ timedate_wait_for_sync() {
     echo "Ожидание синхронизации времени (до 30 секунд)..."
     for i in {1..6}; do
         sleep 5
-        STATUS=$(chronyc tracking 2>/dev/null | grep "Leap status" | awk -F': ' '{print $2}' | xargs || true)
+        STATUS=$(chronyc tracking 2>/dev/null | awk -F': ' '/Leap status/ {print $2}' | xargs || true)
+        if [ -z "$STATUS" ]; then
+            STATUS=$(chronyc tracking 2>/dev/null | awk -F': ' '/Статус прыжка/ {print $2}' | xargs || true)
+        fi
         if [ "$STATUS" = "Normal" ]; then
             echo -e "${GREEN}Синхронизация выполнена!${NC}"
             return
