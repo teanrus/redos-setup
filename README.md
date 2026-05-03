@@ -1,7 +1,5 @@
 # RED OS Workstation Setup Tool
 
-![Logo](img/logo.png)
-
 <!-- *Скрипт для автоматизации первичной настройки рабочих мест на РЕД ОС. Проект выполняет выборочную установку системных и прикладных компонентов, определяет версию ОС, запрашивает подтверждение пользователя перед каждым дополнительным шагом и загружает артефакты только по мере необходимости.* -->
 
 [![Version](https://img.shields.io/badge/version-2.9-green?style=for-the-badge)](https://github.com/teanrus/redos-setup/releases)
@@ -9,6 +7,8 @@
 [![РЕД ОС](https://img.shields.io/badge/%D0%A0%D0%95%D0%94%20%D0%9E%D0%A1-7.x%20%2F%208%2B-red?style=for-the-badge&logo=linux)](https://redos.red-soft.ru/)
 [![GitHub Releases](https://img.shields.io/github/downloads/teanrus/redos-setup/total?style=for-the-badge&logo=github&color=blue)](https://github.com/teanrus/redos-setup/releases)
 [![GitHub Stars](https://img.shields.io/github/stars/teanrus/redos-setup?style=for-the-badge&logo=github&color=yellow)](https://github.com/teanrus/redos-setup/stargazers)
+
+![Logo](img/logo.png)
 
 ## Обзор
 
