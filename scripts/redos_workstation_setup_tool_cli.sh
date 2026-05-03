@@ -84,13 +84,17 @@ CRYPTOPRO_SUPPORTED=0
 VIPNET_SUPPORTED=0
 
 SELINUX_MODE="unknown"
+# Reserved for future non-interactive SELinux policy controls.
+# shellcheck disable=SC2034
 MANAGE_SELINUX_POLICIES=0
 INSTALLED_APPS=()
 
+# shellcheck disable=SC2034
 EXIT_OK=0
 EXIT_ERROR=1
 EXIT_USAGE=2
 EXIT_ROOT_REQUIRED=3
+# shellcheck disable=SC2034
 EXIT_OS_UNSUPPORTED=4
 EXIT_COMPONENT_UNSUPPORTED=5
 EXIT_MISSING_DEPENDENCY=6
@@ -180,6 +184,18 @@ confirm_installation() {
     [[ "$answer" =~ ^[Yy]$ ]]
 }
 
+confirm_removal() {
+    local component_label="$1"
+
+    if [ "$NON_INTERACTIVE" -eq 1 ] || [ "$DIRECT_INSTALL_MODE" -eq 1 ]; then
+        return 0
+    fi
+
+    local answer
+    answer=$(read_from_terminal "${YELLOW}Удалить $component_label? (y/n)${NC}")
+    [[ "$answer" =~ ^[Yy]$ ]]
+}
+
 require_root() {
     if [[ $EUID -ne 0 ]]; then
         die "Этот скрипт должен запускаться с правами root" "$EXIT_ROOT_REQUIRED"
@@ -197,9 +213,90 @@ check_command() {
 
     if ! command -v "$cmd" >/dev/null 2>&1; then
         log_info "Устанавливаю $cmd..."
-        run_cmd dnf install -y "$cmd"
-        [ $? -eq 0 ] || die "Ошибка установки $cmd" "$EXIT_MISSING_DEPENDENCY"
+        run_cmd dnf install -y "$cmd" || die "Ошибка установки $cmd" "$EXIT_MISSING_DEPENDENCY"
     fi
+}
+
+is_package_installed() {
+    rpm -q "$1" >/dev/null 2>&1
+}
+
+is_any_package_installed() {
+    local package_name
+    for package_name in "$@"; do
+        if is_package_installed "$package_name"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+is_repo_configured() {
+    local repo_name="$1"
+    [ -f "/etc/yum.repos.d/$repo_name.repo" ] || grep -q "^\[$repo_name\]" /etc/yum.repos.d/*.repo 2>/dev/null
+}
+
+remove_installed_packages() {
+    local label="$1"
+    shift
+    local -a installed_packages=()
+    local package_name
+
+    for package_name in "$@"; do
+        if is_package_installed "$package_name"; then
+            installed_packages+=("$package_name")
+        fi
+    done
+
+    if [ "${#installed_packages[@]}" -eq 0 ]; then
+        log_success "✓ $label не установлен"
+        return 0
+    fi
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] dnf remove -y ${installed_packages[*]}"
+        return 0
+    fi
+
+    run_cmd dnf remove -y "${installed_packages[@]}" || die "Ошибка удаления $label"
+    log_success "✓ $label удалён"
+}
+
+remove_path_if_exists() {
+    local path="$1"
+
+    if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+        return 0
+    fi
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] rm -rf $path"
+        return 0
+    fi
+
+    rm -rf "$path" || die "Ошибка удаления $path"
+}
+
+remove_exact_line_from_file() {
+    local file="$1"
+    local line="$2"
+    local temp_file
+    local file_mode
+
+    if [ ! -f "$file" ] || ! grep -Fxq "$line" "$file"; then
+        return 0
+    fi
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] remove line from $file: $line"
+        return 0
+    fi
+
+    temp_file=$(mktemp) || die "Не удалось создать временный файл"
+    file_mode=$(stat -c '%a' "$file" 2>/dev/null || echo 755)
+    grep -Fxv "$line" "$file" > "$temp_file" || true
+    mv "$temp_file" "$file" || die "Не удалось обновить $file"
+    chmod "$file_mode" "$file" 2>/dev/null || chmod 755 "$file"
 }
 
 ensure_workdir() {
@@ -282,6 +379,13 @@ prepare_runtime() {
     ensure_workdir
     check_command "curl"
     check_command "wget"
+}
+
+prepare_remove_runtime() {
+    if [ "$DRY_RUN" -ne 1 ]; then
+        require_root
+    fi
+    require_tty_if_needed
 }
 
 prepare_system_defaults() {
@@ -376,6 +480,9 @@ is_component_supported() {
         vipnet)
             [ "$VIPNET_SUPPORTED" -eq 1 ]
             ;;
+        kernel)
+            [ "$IS_REDOS" -eq 1 ] && [ "$OS_MAJOR_VERSION" = "7" ]
+            ;;
         *)
             return 0
             ;;
@@ -386,11 +493,13 @@ component_support_reason() {
     local component_name="$1"
 
     case "$component_name" in
-        cryptopro|vipnet)
+        cryptopro|vipnet|kernel)
             if [ "$IS_REDOS" -ne 1 ]; then
                 echo "компонент поддерживается только на РЕД ОС, а текущая ОС не распознана как РЕД ОС"
             elif [ -z "$OS_MAJOR_VERSION" ]; then
                 echo "не удалось определить основную версию РЕД ОС"
+            elif [ "$component_name" = "kernel" ]; then
+                echo "отдельное обновление ядра через redos-kernels6 доступно только на РЕД ОС 7.x; на РЕД ОС 8+ ядро обновляется через обычный dnf update"
             else
                 echo "компонент недоступен для текущей версии ОС"
             fi
@@ -475,7 +584,8 @@ disable_selinux_if_needed() {
         return 0
     fi
 
-    local selinux_current=$(grep '^SELINUX=' /etc/selinux/config 2>/dev/null | cut -d= -f2)
+    local selinux_current
+    selinux_current=$(grep '^SELINUX=' /etc/selinux/config 2>/dev/null | cut -d= -f2)
     
     # Если SELinux отключен, предлагаем его включить
     if [ "$selinux_current" = "disabled" ]; then
@@ -690,7 +800,9 @@ apply_selinux_audit2allow() {
         audit2allow -a -M redos_setup 2>/dev/null || true
         
         if [ -f redos_setup.pp ]; then
-            semodule -i redos_setup.pp 2>/dev/null && log_success "✓ Политики SELinux применены" || true
+            if semodule -i redos_setup.pp 2>/dev/null; then
+                log_success "✓ Политики SELinux применены"
+            fi
             rm -f redos_setup.pp redos_setup.mod 2>/dev/null || true
         fi
     else
@@ -751,6 +863,7 @@ insert_before_exit() {
     local file="$1"
     local line="$2"
     local temp_file
+    local file_mode
 
     if [ ! -f "$file" ]; then
         die "Файл $file не найден"
@@ -761,7 +874,13 @@ insert_before_exit() {
         return 0
     fi
 
+    if grep -Fxq "$line" "$file"; then
+        log_success "✓ Настройка уже применена: $line"
+        return 0
+    fi
+
     temp_file=$(mktemp) || die "Не удалось создать временный файл"
+    file_mode=$(stat -c '%a' "$file" 2>/dev/null || echo 755)
 
     while IFS= read -r file_line; do
         if [[ "$file_line" =~ ^[[:space:]]*exit[[:space:]]+0 ]]; then
@@ -771,10 +890,15 @@ insert_before_exit() {
     done < "$file"
 
     mv "$temp_file" "$file" || die "Не удалось обновить $file"
-    chmod --reference="$file" "$file" 2>/dev/null || chmod 755 "$file"
+    chmod "$file_mode" "$file" 2>/dev/null || chmod 755 "$file"
 }
 
 write_max_repo() {
+    if is_repo_configured "max"; then
+        log_success "✓ Репозиторий MAX уже настроен"
+        return 0
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         echo "[dry-run] write /etc/yum.repos.d/max.repo"
         return 0
@@ -808,8 +932,7 @@ install_updates() {
 }
 
 install_kernel() {
-    if [ "$IS_REDOS" -ne 1 ] || [ "$OS_MAJOR_VERSION" != "7" ]; then
-        log_warn "Обновление ядра через redos-kernels6 доступно только на РЕД ОС 7.x"
+    if ! is_component_supported "kernel"; then
         return 0
     fi
 
@@ -845,12 +968,12 @@ install_kernel() {
 install_yandex_browser() {
     confirm_installation "$(component_label yandex-browser)" || return 0
 
-    if rpm -q yandex-browser-stable >/dev/null 2>&1; then
+    if is_package_installed yandex-browser-stable; then
         log_success "✓ Яндекс.Браузер уже установлен"
         return 0
     fi
 
-    if ! ls /etc/yum.repos.d/yandex-browser*.repo >/dev/null 2>&1 && ! rpm -q yandex-browser-release >/dev/null 2>&1; then
+    if ! is_repo_configured "yandex-browser" && ! is_package_installed yandex-browser-release; then
         run_cmd dnf install -y yandex-browser-release || log_warn "Не удалось установить yandex-browser-release, продолжаю попытку установки браузера"
     fi
 
@@ -861,12 +984,12 @@ install_yandex_browser() {
 install_r7_office() {
     confirm_installation "$(component_label r7-office)" || return 0
 
-    if rpm -q r7-office >/dev/null 2>&1; then
+    if is_package_installed r7-office; then
         log_success "✓ R7 Office уже установлен"
         return 0
     fi
 
-    if ! rpm -q r7-release >/dev/null 2>&1; then
+    if ! is_repo_configured "r7-office" && ! is_package_installed r7-release; then
         run_cmd dnf install -y r7-release || die "Ошибка установки репозитория R7"
     fi
 
@@ -877,7 +1000,7 @@ install_r7_office() {
 install_max() {
     confirm_installation "$(component_label max)" || return 0
 
-    if rpm -q max >/dev/null 2>&1; then
+    if is_package_installed max; then
         log_success "✓ MAX уже установлен"
         return 0
     fi
@@ -1029,7 +1152,7 @@ if [ $(time_to_minutes "$now") -lt $(time_to_minutes "$START_TIME") ] || [ $(tim
 fi
 echo "Run update: $(date)" >> "$LOG_FILE"
 dnf makecache -q
-count=$(dnf check-update -q 2>/dev/null | grep -c "^[a-z]" || echo 0)
+count=$(dnf check-update -q 2>/dev/null | grep -c "^[a-z]" || true)
 echo "Updates: $count" >> "$LOG_FILE"
 if [ "$count" -gt 0 ]; then
   if [ "$MODE" = "full" ]; then
@@ -1079,6 +1202,11 @@ EOF
 install_liberation_fonts() {
     confirm_installation "$(component_label liberation-fonts)" || return 0
 
+    if [ -d /usr/share/fonts/liberation ] && [ -n "$(ls -A /usr/share/fonts/liberation 2>/dev/null)" ]; then
+        log_success "✓ Шрифты Liberation уже установлены"
+        return 0
+    fi
+
     if ! command -v unzip >/dev/null 2>&1; then
         run_cmd dnf install -y unzip || die "Ошибка установки unzip"
     fi
@@ -1112,6 +1240,11 @@ install_liberation_fonts() {
 install_chromium_gost() {
     confirm_installation "$(component_label chromium-gost)" || return 0
 
+    if is_package_installed chromium-gost-stable; then
+        log_success "✓ Chromium-GOST уже установлен"
+        return 0
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлен Chromium-GOST"
         return 0
@@ -1126,6 +1259,11 @@ install_chromium_gost() {
 install_sreda() {
     confirm_installation "$(component_label sreda)" || return 0
 
+    if is_package_installed sreda; then
+        log_success "✓ Среда уже установлена"
+        return 0
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлен мессенджер СРЕДА"
         return 0
@@ -1139,6 +1277,11 @@ install_sreda() {
 
 install_vk_messenger() {
     confirm_installation "$(component_label vk-messenger)" || return 0
+
+    if is_package_installed vk-messenger; then
+        log_success "✓ VK Messenger уже установлен"
+        return 0
+    fi
 
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлен VK Messenger"
@@ -1172,6 +1315,11 @@ EOF
 install_telegram() {
     confirm_installation "$(component_label telegram)" || return 0
 
+    if [ -x /opt/telegram/Telegram ] || command -v telegram >/dev/null 2>&1; then
+        log_success "✓ Telegram уже установлен"
+        return 0
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлен Telegram в /opt/telegram"
         return 0
@@ -1199,6 +1347,11 @@ install_messengers_group() {
 
 install_kaspersky() {
     confirm_installation "$(component_label kaspersky)" || return 0
+
+    if [ -d /opt/kaspersky ] || is_any_package_installed klnagent kesl; then
+        log_success "✓ Kaspersky Agent уже установлен"
+        return 0
+    fi
 
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлен Kaspersky Agent"
@@ -1230,6 +1383,11 @@ install_vipnet_client() {
     local client_asset
     client_asset=$(vipnet_client_asset)
 
+    if is_any_package_installed vipnetclient-gui_gost_ru_x86-64 vipnetclient-gui_gost_x86-64; then
+        log_success "✓ ViPNet Client уже установлен"
+        return 0
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлен ViPNet Client из пакета $client_asset"
         return 0
@@ -1244,6 +1402,11 @@ install_vipnet_client() {
 install_vipnet_dp() {
     local client_asset
     client_asset=$(vipnet_client_asset)
+
+    if is_any_package_installed vipnetbusinessmail_ru_x86-64 vipnetclient-gui_gost_ru_x86-64 vipnetclient-gui_gost_x86-64; then
+        log_success "✓ ViPNet или Деловая почта уже установлены"
+        return 0
+    fi
 
     if [ "$DRY_RUN" -eq 1 ]; then
         if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
@@ -1318,6 +1481,11 @@ install_vipnet() {
 install_1c() {
     confirm_installation "$(component_label 1c)" || return 0
 
+    if [ -d /opt/1cv8 ] || [ -d /opt/1C ] || [ -d /usr/lib1cv8 ]; then
+        log_success "✓ 1С:Предприятие уже установлена"
+        return 0
+    fi
+
     if [ "$DRY_RUN" -eq 1 ]; then
         log_info "Будет установлена платформа 1С:Предприятие"
         return 0
@@ -1367,6 +1535,112 @@ setup_ksg() {
 }
 
 # ------------------------------
+# 10. Removal helpers
+# ------------------------------
+
+remove_yandex_browser() {
+    remove_installed_packages "$(component_label yandex-browser)" yandex-browser-stable yandex-browser-release
+}
+
+remove_r7_office() {
+    remove_installed_packages "$(component_label r7-office)" r7-office r7-release
+}
+
+remove_max() {
+    remove_installed_packages "$(component_label max)" max
+    remove_path_if_exists /etc/yum.repos.d/max.repo
+    log_success "✓ Репозиторий MAX удалён, если был создан скриптом"
+}
+
+remove_liberation_fonts() {
+    remove_path_if_exists /usr/share/fonts/liberation
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] fc-cache -fv"
+    elif command -v fc-cache >/dev/null 2>&1; then
+        fc-cache -fv >/dev/null 2>&1 || true
+    fi
+    log_success "✓ Шрифты Liberation удалены"
+}
+
+remove_chromium_gost() {
+    remove_installed_packages "$(component_label chromium-gost)" chromium-gost-stable chromium-gost
+}
+
+remove_sreda() {
+    remove_installed_packages "$(component_label sreda)" sreda
+}
+
+remove_vk_messenger() {
+    remove_installed_packages "$(component_label vk-messenger)" vk-messenger
+}
+
+remove_telegram() {
+    remove_path_if_exists /opt/telegram
+    remove_path_if_exists /usr/bin/telegram
+    remove_path_if_exists /usr/share/applications/telegram.desktop
+    log_success "✓ Telegram удалён"
+}
+
+remove_messengers_group() {
+    remove_sreda
+    remove_vk_messenger
+    remove_telegram
+}
+
+remove_kaspersky() {
+    remove_installed_packages "$(component_label kaspersky)" klnagent kesl
+    remove_path_if_exists /opt/kaspersky
+}
+
+remove_vipnet() {
+    remove_installed_packages "$(component_label vipnet)" \
+        vipnetclient-gui_gost_ru_x86-64 \
+        vipnetclient-gui_gost_x86-64 \
+        vipnetbusinessmail_ru_x86-64
+}
+
+remove_1c() {
+    remove_installed_packages "$(component_label 1c)" 1c-enterprise 1c-enterprise83-common 1c-enterprise83-server 1c-enterprise83-client
+    remove_path_if_exists /opt/1cv8
+    remove_path_if_exists /opt/1C
+    remove_path_if_exists /usr/lib1cv8
+}
+
+remove_trim() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] systemctl disable --now fstrim.timer"
+    else
+        systemctl disable --now fstrim.timer || true
+    fi
+    log_success "✓ TRIM timer отключён"
+}
+
+remove_ksg() {
+    remove_exact_line_from_file "/etc/gdm/Init/Default" "xrandr --output HDMI-3 --primary"
+    log_success "✓ Настройка KSG удалена"
+}
+
+remove_timedate() {
+    remove_installed_packages "$(component_label timedate)" chrony
+}
+
+remove_auto_update() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[dry-run] systemctl disable --now redos-auto-update.timer"
+        echo "[dry-run] rm -f /etc/redos-auto-update.conf /usr/local/bin/redos-auto-update /etc/systemd/system/redos-auto-update.service /etc/systemd/system/redos-auto-update.timer"
+        return 0
+    fi
+
+    systemctl disable --now redos-auto-update.timer 2>/dev/null || true
+    rm -f /etc/redos-auto-update.conf \
+        /usr/local/bin/redos-auto-update \
+        /etc/systemd/system/redos-auto-update.service \
+        /etc/systemd/system/redos-auto-update.timer
+    systemctl daemon-reload 2>/dev/null || true
+    log_success "✓ Автоматическое обновление удалено"
+}
+
+# ------------------------------
 # 11a. Workstation-compatible overrides
 # ------------------------------
 
@@ -1382,6 +1656,18 @@ component_exists() {
     local component="$1"
     case "$component" in
         base|update-system|kernel|yandex-browser|r7-office|max|liberation-fonts|chromium-gost|sreda|vk-messenger|telegram|messengers|kaspersky|vipnet|1c|trim|grub|ksg|timedate|auto-update|all)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+component_removable() {
+    local component="$1"
+    case "$component" in
+        yandex-browser|r7-office|max|liberation-fonts|chromium-gost|sreda|vk-messenger|telegram|messengers|kaspersky|vipnet|1c|trim|ksg|timedate|auto-update|all)
             return 0
             ;;
         *)
@@ -1484,10 +1770,41 @@ run_component_install() {
     esac
 }
 
+run_component_remove() {
+    local component="$1"
+
+    case "$component" in
+        yandex-browser) remove_yandex_browser ;;
+        r7-office) remove_r7_office ;;
+        max) remove_max ;;
+        liberation-fonts) remove_liberation_fonts ;;
+        chromium-gost) remove_chromium_gost ;;
+        sreda) remove_sreda ;;
+        vk-messenger) remove_vk_messenger ;;
+        telegram) remove_telegram ;;
+        messengers) remove_messengers_group ;;
+        kaspersky) remove_kaspersky ;;
+        vipnet) remove_vipnet ;;
+        1c) remove_1c ;;
+        trim) remove_trim ;;
+        ksg) remove_ksg ;;
+        timedate) remove_timedate ;;
+        auto-update) remove_auto_update ;;
+        all) remove_all_removable ;;
+        base|update-system|kernel|grub)
+            log_warn "$(component_label "$component") не удаляется автоматически"
+            ;;
+        *) die "Неизвестный компонент: $component" "$EXIT_USAGE" ;;
+    esac
+}
+
 install_all_compatible() {
     local component
     while IFS= read -r component; do
         [ "$component" = "all" ] && continue
+        if [ "$component" = "update-system" ] || [ "$component" = "kernel" ]; then
+            continue
+        fi
         if is_component_supported "$component"; then
             run_component_install "$component"
         else
@@ -1516,6 +1833,32 @@ auto-update
 EOF
 }
 
+remove_all_removable() {
+    local component
+    while IFS= read -r component; do
+        [ "$component" = "all" ] && continue
+        if component_removable "$component"; then
+            run_component_remove "$component"
+        fi
+    done << 'EOF'
+yandex-browser
+r7-office
+max
+liberation-fonts
+chromium-gost
+sreda
+vk-messenger
+telegram
+kaspersky
+vipnet
+1c
+trim
+ksg
+timedate
+auto-update
+EOF
+}
+
 component_requires_variant() {
     local component="$1"
     [ "$component" = "vipnet" ]
@@ -1531,6 +1874,7 @@ Usage:
   redos_workstation_setup_tool_cli.sh check-os
   redos_workstation_setup_tool_cli.sh list [--compatible]
   redos_workstation_setup_tool_cli.sh install <component> [options]
+  redos_workstation_setup_tool_cli.sh remove <component> [options]
   redos_workstation_setup_tool_cli.sh doctor
   redos_workstation_setup_tool_cli.sh interactive
 
@@ -1545,6 +1889,8 @@ Commands:
       Показать компоненты
   install <component>
       Установить конкретный компонент или all
+  remove <component>
+      Удалить установленную программу или настройку, если поддерживается
   doctor
       Выполнить базовую диагностику среды
   interactive
@@ -1568,6 +1914,25 @@ Components:
   1c
   trim
   grub
+  ksg
+  timedate
+  auto-update
+  all
+
+Removable components:
+  yandex-browser
+  r7-office
+  max
+  liberation-fonts
+  chromium-gost
+  sreda
+  vk-messenger
+  telegram
+  messengers
+  kaspersky
+  vipnet
+  1c
+  trim
   ksg
   timedate
   auto-update
@@ -1619,6 +1984,22 @@ cmd_install() {
 
     run_component_install "$component"
     apply_policies_for_all_apps
+}
+
+cmd_remove() {
+    local component="$1"
+
+    [ -n "$component" ] || die "Не указан компонент для remove" "$EXIT_USAGE"
+    component_exists "$component" || die "Неизвестный компонент: $component" "$EXIT_USAGE"
+
+    if ! component_removable "$component"; then
+        die "Компонент не поддерживает автоматическое удаление: $component" "$EXIT_USAGE"
+    fi
+
+    DIRECT_INSTALL_MODE=1
+    prepare_remove_runtime
+    confirm_removal "$(component_label "$component")" || return 0
+    run_component_remove "$component"
 }
 
 cmd_list() {
@@ -1705,6 +2086,7 @@ parse_global_args() {
                 shift
                 ;;
             --force)
+                # shellcheck disable=SC2034
                 FORCE=1
                 shift
                 ;;
@@ -1722,7 +2104,7 @@ parse_global_args() {
                 TARGET_VARIANT="$2"
                 shift 2
                 ;;
-            help|version|check-os|list|install|doctor|interactive)
+            help|version|check-os|list|install|remove|uninstall|doctor|interactive)
                 COMMAND="$1"
                 shift
                 REMAINING_ARGS=("$@")
@@ -1736,7 +2118,49 @@ parse_global_args() {
 }
 
 parse_install_args() {
-    TARGET_COMPONENT="${REMAINING_ARGS[0]:-}"
+    TARGET_COMPONENT="${1:-}"
+    local arg
+    shift || true
+
+    while [ $# -gt 0 ]; do
+        arg="$1"
+        case "$arg" in
+            --variant)
+                [ $# -ge 2 ] || die "Для --variant требуется значение" "$EXIT_USAGE"
+                TARGET_VARIANT="$2"
+                shift 2
+                ;;
+            --workdir)
+                [ $# -ge 2 ] || die "Для --workdir требуется путь" "$EXIT_USAGE"
+                WORK_DIR="$2"
+                shift 2
+                ;;
+            -y|--yes)
+                NON_INTERACTIVE=1
+                shift
+                ;;
+            --dry-run)
+                DRY_RUN=1
+                shift
+                ;;
+            --verbose)
+                VERBOSE=1
+                shift
+                ;;
+            --no-color)
+                NO_COLOR=1
+                shift
+                ;;
+            --force)
+                # shellcheck disable=SC2034
+                FORCE=1
+                shift
+                ;;
+            *)
+                die "Неизвестный аргумент install: $arg" "$EXIT_USAGE"
+                ;;
+        esac
+    done
 }
 
 # ------------------------------
@@ -1763,8 +2187,12 @@ dispatch_command() {
             cmd_list
             ;;
         install)
-            parse_install_args
+            parse_install_args "${REMAINING_ARGS[@]}"
             cmd_install "$TARGET_COMPONENT"
+            ;;
+        remove|uninstall)
+            parse_install_args "${REMAINING_ARGS[@]}"
+            cmd_remove "$TARGET_COMPONENT"
             ;;
         doctor)
             cmd_doctor
@@ -1785,6 +2213,3 @@ main() {
 }
 
 main "$@"
-
-
-

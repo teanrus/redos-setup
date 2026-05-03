@@ -1,4 +1,4 @@
-﻿#!/bin/bash
+#!/bin/bash
 
 ##############################################################################
 # redos_workstation_setup_tool.sh — Автоматизированная настройка РЕД ОС
@@ -147,7 +147,7 @@ timedate_install_chrony() {
     echo -e "${BLUE}Установка chrony...${NC}"
     dnf install -y chrony > /dev/null 2>&1
     check_success "Установка chrony"
-    cp /etc/chrony.conf /etc/chrony.conf.backup.$(date +%Y%m%d_%H%M%S) || true
+    cp /etc/chrony.conf "/etc/chrony.conf.backup.$(date +%Y%m%d_%H%M%S)" || true
     echo -e "${BLUE}Настройка серверов времени...${NC}"
     cat > /etc/chrony.conf << EOF
 # Серверы точного времени ВНИИФТРИ (Stratum-1, Россия)
@@ -257,7 +257,7 @@ if [ $(time_to_minutes "$now") -lt $(time_to_minutes "$START_TIME") ] || [ $(tim
 fi
 echo "Run update: $(date)" >> "$LOG_FILE"
 dnf makecache -q
-count=$(dnf check-update -q 2>/dev/null | grep -c "^[a-z]" || echo 0)
+count=$(dnf check-update -q 2>/dev/null | grep -c "^[a-z]" || true)
 echo "Updates: $count" >> "$LOG_FILE"
 if [ "$count" -gt 0 ]; then
   if [ "$MODE" = "full" ]; then dnf upgrade -y >> "$LOG_FILE" 2>&1; else dnf upgrade --security -y >> "$LOG_FILE" 2>&1; fi
@@ -339,6 +339,16 @@ is_package_installed() {
     rpm -q "$1" &>/dev/null
 }
 
+is_any_package_installed() {
+    local package_name
+    for package_name in "$@"; do
+        if is_package_installed "$package_name"; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 # Проверка наличия репозитория
 is_repo_configured() {
     local repo_name="$1"
@@ -387,7 +397,11 @@ install_updates() {
 
 # Обновление ядра (только версия 7.х)
 install_kernel() {
-    if is_redos7 && confirm_installation "обновление ядра (redos-kernels6) для РЕД ОС 7.x"; then
+    if ! is_redos7; then
+        return 0
+    fi
+
+    if confirm_installation "обновление ядра (redos-kernels6) для РЕД ОС 7.x"; then
         echo -e "${BLUE}Обновление ядра...${NC}"
         if ! is_package_installed redos-kernels6-release; then
             dnf install -y redos-kernels6-release
@@ -408,7 +422,7 @@ install_kernel() {
             else
                 echo -e "${YELLOW}Обнаружено $kernel_count ядер. Будут удалены старые, останутся только последние 3.${NC}"
                 # Получаем список для удаления
-                kernels_to_remove=( "${kernel_pkgs[@]:0:$(($kernel_count-3))}" )
+                kernels_to_remove=( "${kernel_pkgs[@]:0:$((kernel_count-3))}" )
                 for k in "${kernels_to_remove[@]}"; do
                     echo -e "${YELLOW}Удаление: $k${NC}"
                     dnf remove -y "$k"
@@ -557,11 +571,11 @@ install_kaspersky() {
                 for script in *.sh; do
                     if [ -f "$script" ]; then
                         chmod +x "$script"
-                        ./$"script"
+                        ./"$script"
                     fi
                 done
                 check_success "установка Kaspersky Agent"
-                rm -f kasp.tar.gz *.sh
+                rm -f kasp.tar.gz ./*.sh
                 cd - > /dev/null
             fi
         else
@@ -574,6 +588,11 @@ install_kaspersky() {
 
 install_vipnet() {
     if confirm_installation "установку ViPNet"; then
+        if is_any_package_installed vipnetclient-gui_gost_ru_x86-64 vipnetclient-gui_gost_x86-64 vipnetbusinessmail_ru_x86-64; then
+            echo -e "${GREEN}✓ ViPNet уже установлен${NC}"
+            return
+        fi
+
         echo -e "${GREEN}=== Выбор версии ViPNet ===${NC}"
         echo "1. ViPNet Client (без деловой почты)"
         echo "2. ViPNet + Деловая почта (DP)"
