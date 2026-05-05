@@ -1012,14 +1012,14 @@ install_max() {
 }
 
 timedate_select_timezone() {
-    echo ""
-    log_info "[Выбор часового пояса]"
-    log_info "Можно ввести номер из списка или смещение UTC, например +5."
+    echo "" >&2
+    log_info "[Выбор часового пояса]" >&2
+    log_info "Можно ввести номер из списка или смещение UTC, например +5." >&2
     local i
     for i in "${!TZ_NAMES[@]}"; do
-        echo "  $((i + 1)). ${TZ_NAMES[$i]}"
+        echo "  $((i + 1)). ${TZ_NAMES[$i]}" >&2
     done
-    echo ""
+    echo "" >&2
 
     local choice
     while true; do
@@ -1038,7 +1038,7 @@ timedate_select_timezone() {
             fi
         fi
 
-        log_warn "Неверный выбор. Введите номер от 1 до ${#TZ_NAMES[@]} или смещение UTC (+2…+12)"
+        log_warn "Неверный выбор. Введите номер от 1 до ${#TZ_NAMES[@]} или смещение UTC (+2…+12)" >&2
     done
 }
 
