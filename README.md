@@ -22,14 +22,14 @@
 
 Проект включает два сценария запуска:
 
-- `redos_workstation_setup_tool_cli.sh` - CLI-интерфейс для точечной установки компонентов и отдельных системных шагов;
-- `redos_workstation_setup_tool.sh` - отдельный интерактивный сценарий подготовки рабочей станции с дополнительными системными настройками.
+- `scripts/redos_workstation_setup_tool_cli.sh` - CLI-интерфейс для точечной установки компонентов и отдельных системных шагов;
+- `scripts/redos_workstation_setup_tool.sh` - отдельный интерактивный сценарий подготовки рабочей станции с дополнительными системными настройками.
 
 ## Какой файл использовать
 
-Используйте `redos_workstation_setup_tool_cli.sh`, если нужен управляемый интерфейс с командами и флагами: для точечной установки компонентов, отдельных системных шагов, `dry-run`, неинтерактивного запуска и автоматизации. Команда `interactive` в CLI покрывает сценарий, близкий по функциональности к `redos_workstation_setup_tool.sh`.
+Используйте `scripts/redos_workstation_setup_tool_cli.sh`, если нужен управляемый интерфейс с командами и флагами: для точечной установки компонентов, отдельных системных шагов, `dry-run`, неинтерактивного запуска и автоматизации. Команда `interactive` в CLI покрывает сценарий, близкий по функциональности к `scripts/redos_workstation_setup_tool.sh`.
 
-Используйте `redos_workstation_setup_tool.sh`, если нужен полностью интерактивный workstation-сценарий без работы через команды CLI: с настройкой часового пояса, `chrony`, автоматических обновлений, TRIM, KSG и базовых изменений SELinux.
+Используйте `scripts/redos_workstation_setup_tool.sh`, если нужен полностью интерактивный workstation-сценарий без работы через команды CLI: с настройкой часового пояса, `chrony`, автоматических обновлений, TRIM, KSG и базовых изменений SELinux.
 
 ## Возможности
 
@@ -39,9 +39,9 @@
 - Автоматическая очистка временных файлов из `/home/inst`
 - Установка пакетов через `dnf` и vendor-архивы из GitHub Releases
 - Проверка совместимости `ViPNet` с установленной версией РЕД ОС
-- CLI-режим через `redos_workstation_setup_tool_cli.sh`
+- CLI-режим через `scripts/redos_workstation_setup_tool_cli.sh`
 - CLI-команды для отдельных шагов workstation-настройки: обновление системы, ядра, времени, автообновлений и других системных действий
-- Отдельный интерактивный workstation-сценарий через `redos_workstation_setup_tool.sh`
+- Отдельный интерактивный workstation-сценарий через `scripts/redos_workstation_setup_tool.sh`
 - Настройка времени и `chrony` с выбором часового пояса и NTP-серверов
 - Настройка автоматических обновлений через `systemd timer`
 
@@ -68,35 +68,35 @@
 
 ```bash
 # CLI с командами и флагами
-curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool_cli.sh | sudo bash
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh | sudo bash
 
 # интерактивный workstation-сценарий
-curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh | sudo bash
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh | sudo bash
 ```
 
 Запуск нового CLI из последнего релиза и проверка контрольной суммы:
 
 ```bash
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool_cli.sh
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool_cli.sh.sha256
-sha256sum -c redos_workstation_setup_tool_cli.sh.sha256
-chmod +x redos_workstation_setup_tool_cli.sh
-sudo ./redos_workstation_setup_tool_cli.sh help
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh.sha256
+sha256sum -c scripts/redos_workstation_setup_tool_cli.sh.sha256
+chmod +x scripts/redos_workstation_setup_tool_cli.sh
+sudo ./scripts/redos_workstation_setup_tool_cli.sh help
 ```
 
 Запуск workstation tool из репозитория:
 
 ```bash
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh.sha256
-sha256sum -c redos_workstation_setup_tool.sh.sha256
-chmod +x redos_workstation_setup_tool.sh
-sudo ./redos_workstation_setup_tool.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh.sha256
+sha256sum -c scripts/redos_workstation_setup_tool.sh.sha256
+chmod +x scripts/redos_workstation_setup_tool.sh
+sudo ./scripts/redos_workstation_setup_tool.sh
 ```
 
 ## CLI
 
-Файл `redos_workstation_setup_tool_cli.sh` предоставляет основной CLI-интерфейс проекта.
+Файл `scripts/redos_workstation_setup_tool_cli.sh` предоставляет основной CLI-интерфейс проекта.
 
 Поддерживаемые команды:
 
@@ -107,7 +107,7 @@ sudo ./redos_workstation_setup_tool.sh
 - `install <component>` - установить конкретный компонент или отдельный шаг настройки;
 - `remove <component>` - удалить установленный компонент или настройку, если поддерживается (alias: `uninstall`);
 - `doctor` - выполнить базовую диагностику окружения;
-- `interactive` - запустить workstation-сценарий, близкий по возможностям к `redos_workstation_setup_tool.sh`.
+- `interactive` - запустить workstation-сценарий, близкий по возможностям к `scripts/redos_workstation_setup_tool.sh`.
 
 Поддерживаемые компоненты CLI:
 
@@ -158,127 +158,127 @@ sudo ./redos_workstation_setup_tool.sh
 Показать справку:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh help
+sudo ./scripts/redos_workstation_setup_tool_cli.sh help
 ```
 
 Показать версию CLI:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh version
+sudo ./scripts/redos_workstation_setup_tool_cli.sh version
 ```
 
 Проверить определение ОС и совместимость:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh check-os
+sudo ./scripts/redos_workstation_setup_tool_cli.sh check-os
 ```
 
 Показать все компоненты:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh list
+sudo ./scripts/redos_workstation_setup_tool_cli.sh list
 ```
 
 Показать только совместимые компоненты:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh list --compatible
+sudo ./scripts/redos_workstation_setup_tool_cli.sh list --compatible
 ```
 
 Установить базовую систему:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install base
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install base
 ```
 
 Обновить систему отдельной командой:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install update-system
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install update-system
 ```
 
 Обновить ядро на `РЕД ОС 7.x`:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install kernel
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install kernel
 ```
 
 Установить Яндекс.Браузер:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install yandex-browser
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install yandex-browser
 ```
 
 Установить R7 Office:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install r7-office
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install r7-office
 ```
 
 Установить MAX:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install max
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install max
 ```
 
 Установить Chromium-GOST:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install chromium-gost
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install chromium-gost
 ```
 
 Установить ViPNet Client:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install vipnet --variant client
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant client
 ```
 
 Установить ViPNet + Деловая почта:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install vipnet --variant dp
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant dp
 ```
 
 Установить все совместимые компоненты без подтверждений:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh --yes install all
+sudo ./scripts/redos_workstation_setup_tool_cli.sh --yes install all
 ```
 
 Показать план действий без изменений:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh --dry-run install base
+sudo ./scripts/redos_workstation_setup_tool_cli.sh --dry-run install base
 ```
 
 Настроить время и `chrony`:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install timedate
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install timedate
 ```
 
 Настроить автоматические обновления:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh install auto-update
+sudo ./scripts/redos_workstation_setup_tool_cli.sh install auto-update
 ```
 
 Запустить диагностику:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh doctor
+sudo ./scripts/redos_workstation_setup_tool_cli.sh doctor
 ```
 
 Удалить установленный компонент:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh remove vipnet
+sudo ./scripts/redos_workstation_setup_tool_cli.sh remove vipnet
 ```
 
 Запустить интерактивный workstation-режим:
 
 ```bash
-sudo ./redos_workstation_setup_tool_cli.sh interactive
+sudo ./scripts/redos_workstation_setup_tool_cli.sh interactive
 ```
 
 ### Глобальные флаги CLI
@@ -295,7 +295,7 @@ sudo ./redos_workstation_setup_tool_cli.sh interactive
 
 ## Workstation Tool
 
-Файл `redos_workstation_setup_tool.sh` предназначен для интерактивной подготовки рабочей станции РЕД ОС. Он охватывает не только установку ПО, но и эксплуатационные настройки, которые обычно выполняются после развёртывания системы. В отличие от `redos_workstation_setup_tool_cli.sh`, этот сценарий не требует отдельных команд и ведёт пользователя по шагам в полностью интерактивном режиме.
+Файл `scripts/redos_workstation_setup_tool.sh` предназначен для интерактивной подготовки рабочей станции РЕД ОС. Он охватывает не только установку ПО, но и эксплуатационные настройки, которые обычно выполняются после развёртывания системы. В отличие от `scripts/redos_workstation_setup_tool_cli.sh`, этот сценарий не требует отдельных команд и ведёт пользователя по шагам в полностью интерактивном режиме.
 
 Что умеет сценарий:
 
@@ -310,7 +310,7 @@ sudo ./redos_workstation_setup_tool_cli.sh interactive
 Пример запуска:
 
 ```bash
-sudo ./redos_workstation_setup_tool.sh
+sudo ./scripts/redos_workstation_setup_tool.sh
 ```
 
 Минимальные зависимости, указанные в самом сценарии:
@@ -392,7 +392,7 @@ sudo ./redos_workstation_setup_tool.sh
 
 ## Изменения в системе
 
-Сценарии `redos_workstation_setup_tool_cli.sh` и `redos_workstation_setup_tool.sh` вносят изменения в систему. Конкретный набор изменений зависит от выбранного сценария и подтверждённых шагов. Перед запуском стоит учитывать следующие действия:
+Сценарии `scripts/redos_workstation_setup_tool_cli.sh` и `scripts/redos_workstation_setup_tool.sh` вносят изменения в систему. Конкретный набор изменений зависит от выбранного сценария и подтверждённых шагов. Перед запуском стоит учитывать следующие действия:
 
 - обновляет пакеты через `dnf`;
 - спрашивает пользователя о настройке SELinux (см. раздел [Управление SELinux](#управление-selinux));
@@ -402,7 +402,7 @@ sudo ./redos_workstation_setup_tool.sh
 - может включить `fstrim.timer`;
 - может добавить `xrandr --output HDMI-3 --primary` в `/etc/gdm/Init/Default`.
 
-Для `redos_workstation_setup_tool_cli.sh` эти изменения выполняются только при запуске соответствующих команд или через `interactive`. В `redos_workstation_setup_tool.sh` те же шаги доступны в полностью интерактивном режиме.
+Для `scripts/redos_workstation_setup_tool_cli.sh` эти изменения выполняются только при запуске соответствующих команд или через `interactive`. В `scripts/redos_workstation_setup_tool.sh` те же шаги доступны в полностью интерактивном режиме.
 
 ### Дополнительные системные настройки
 
@@ -535,8 +535,8 @@ ViPNet:
 ## Документация проекта
 
 - [README.md](README.md) - обзор проекта, совместимость, установка и описание поведения сценариев
-- [redos_workstation_setup_tool_cli.sh](redos_workstation_setup_tool_cli.sh) - CLI-сценарий для точечной установки компонентов и системных шагов
-- [redos_workstation_setup_tool.sh](redos_workstation_setup_tool.sh) - интерактивный сценарий подготовки рабочей станции
+- [scripts/redos_workstation_setup_tool_cli.sh](scripts/redos_workstation_setup_tool_cli.sh) - CLI-сценарий для точечной установки компонентов и системных шагов
+- [scripts/redos_workstation_setup_tool.sh](scripts/redos_workstation_setup_tool.sh) - интерактивный сценарий подготовки рабочей станции
 - [CONTRIBUTING.md](CONTRIBUTING.md) - правила и рекомендации для изменений в репозитории
 - [CHANGELOG.md](CHANGELOG.md) - заметные изменения по релизам и в `Unreleased`
 - [SECURITY.md](SECURITY.md) - краткая политика по поддерживаемым версиям и сообщениям об уязвимостях
