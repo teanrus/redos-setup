@@ -1424,17 +1424,24 @@ install_vipnet_dp() {
         rm -f "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
     else
         download_from_github "VipNet-DP.tar.gz" "$WORK_DIR" || die "Ошибка загрузки ViPNet-DP" "$EXIT_DOWNLOAD_FAILED"
-        cd "$WORK_DIR" || die "Не удалось перейти в $WORK_DIR"
-        tar -xzf VipNet-DP.tar.gz || die "Ошибка распаковки ViPNet-DP.tar.gz"
-        cd VipNet-DP || die "Не удалось перейти в каталог VipNet-DP"
+        local extract_dir
+        extract_dir=$(mktemp -d "$WORK_DIR/vipnet-dp.XXXXXX") || die "Не удалось создать временный каталог ViPNet-DP"
+        tar -xzf "$WORK_DIR/VipNet-DP.tar.gz" -C "$extract_dir" || die "Ошибка распаковки ViPNet-DP.tar.gz"
+
+        local -a rpm_files=()
+        mapfile -d '' -t rpm_files < <(find "$extract_dir" -type f -name '*.rpm' -print0 | sort -z)
+        if [ "${#rpm_files[@]}" -eq 0 ]; then
+            rm -rf "$extract_dir"
+            rm -f "$WORK_DIR/VipNet-DP.tar.gz"
+            die "В архиве VipNet-DP.tar.gz не найдены RPM-пакеты"
+        fi
+
         local rpm
-        for rpm in ./*.rpm; do
-            [ -f "$rpm" ] || continue
+        for rpm in "${rpm_files[@]}"; do
             run_cmd dnf install -y "$rpm" || die "Ошибка установки ViPNet RPM: $rpm"
         done
-        cd "$WORK_DIR" || die "Не удалось вернуться в $WORK_DIR"
-        rm -rf VipNet-DP
-        rm -f VipNet-DP.tar.gz
+        rm -rf "$extract_dir"
+        rm -f "$WORK_DIR/VipNet-DP.tar.gz"
     fi
 
     log_success "✓ ViPNet + Деловая почта установлены"

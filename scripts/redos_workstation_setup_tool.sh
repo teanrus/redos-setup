@@ -600,18 +600,48 @@ install_vipnet() {
         choice=$(read_from_terminal "${YELLOW}Выберите вариант (1 или 2):${NC}")
         
         if [ "$choice" = "1" ]; then
-            local client_asset="vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+            local client_asset
+            if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+                client_asset="vipnetclient-gui_gost_x86-64_5.1.3-8402.rpm"
+            else
+                client_asset="vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
+            fi
             if download_from_github "$client_asset"; then
                 dnf install -y "$WORK_DIR/$client_asset"
                 check_success "установка ViPNet Client"
                 rm -f "$WORK_DIR/$client_asset"
             fi
         elif [ "$choice" = "2" ]; then
-            local client_asset="vipnetclient-gui_gost_ru_x86-64_4.15.0-26717.rpm"
-            if download_from_github "$client_asset" && download_from_github "vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"; then
-                dnf install -y "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
-                check_success "установка ViPNet + Деловая почта"
-                rm -f "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
+            if [ -n "$OS_MAJOR_VERSION" ] && [ "$OS_MAJOR_VERSION" -ge 8 ]; then
+                local client_asset="vipnetclient-gui_gost_x86-64_5.1.3-8402.rpm"
+                if download_from_github "$client_asset" && download_from_github "vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"; then
+                    dnf install -y "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
+                    check_success "установка ViPNet + Деловая почта"
+                    rm -f "$WORK_DIR/$client_asset" "$WORK_DIR/vipnetbusinessmail_ru_x86-64_1.4.2-5248.rpm"
+                fi
+            elif download_from_github "VipNet-DP.tar.gz"; then
+                local extract_dir
+                extract_dir=$(mktemp -d "$WORK_DIR/vipnet-dp.XXXXXX")
+                tar -xzf "$WORK_DIR/VipNet-DP.tar.gz" -C "$extract_dir"
+                check_success "распаковка ViPNet-DP.tar.gz"
+
+                local -a rpm_files=()
+                mapfile -d '' -t rpm_files < <(find "$extract_dir" -type f -name '*.rpm' -print0 | sort -z)
+                if [ "${#rpm_files[@]}" -eq 0 ]; then
+                    echo -e "${RED}✗ В архиве VipNet-DP.tar.gz не найдены RPM-пакеты${NC}"
+                    rm -rf "$extract_dir"
+                    rm -f "$WORK_DIR/VipNet-DP.tar.gz"
+                    exit 1
+                fi
+
+                local rpm
+                for rpm in "${rpm_files[@]}"; do
+                    dnf install -y "$rpm"
+                    check_success "установка ViPNet RPM: $rpm"
+                done
+
+                rm -rf "$extract_dir"
+                rm -f "$WORK_DIR/VipNet-DP.tar.gz"
             fi
         else
             echo -e "${RED}Неверный выбор${NC}"
