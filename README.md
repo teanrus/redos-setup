@@ -69,13 +69,13 @@
 #### CLI с командами и флагами
 
 ```bash
-curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh | sudo bash
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool_cli.sh | sudo bash
 ```
 
 #### интерактивный workstation-сценарий
 
 ```bash
-curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh | sudo bash
+curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh | sudo bash
 ```
 
 ### Запуск нового CLI из последнего релиза и проверка контрольной суммы:
@@ -83,8 +83,8 @@ curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts
 ```bash
 mkdir ~/scripts
 cd ~/scripts
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh.sha256
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool_cli.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool_cli.sh.sha256
 sha256sum -c ~/scripts/redos_workstation_setup_tool_cli.sh.sha256
 chmod +x ~/scripts/redos_workstation_setup_tool_cli.sh
 sudo ~/scripts/redos_workstation_setup_tool_cli.sh help
@@ -95,8 +95,8 @@ sudo ~/scripts/redos_workstation_setup_tool_cli.sh help
 ```bash
 mkdir ~/scripts
 cd ~/scripts
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh
-curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh.sha256
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh
+curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh.sha256
 sha256sum -c ~/scripts/redos_workstation_setup_tool.sh.sha256
 chmod +x ~/scripts/redos_workstation_setup_tool.sh
 sudo ~/scripts/redos_workstation_setup_tool.sh
