@@ -64,7 +64,7 @@
 
 ## Быстрый старт
 
-### Запуск напрямую из последнего релиза:
+### Запуск напрямую из последнего релиза
 
 #### CLI с командами и флагами
 
@@ -78,7 +78,7 @@ curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_w
 curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/redos_workstation_setup_tool.sh | sudo bash
 ```
 
-### Запуск нового CLI из последнего релиза и проверка контрольной суммы:
+### Запуск нового CLI из последнего релиза и проверка контрольной суммы
 
 ```bash
 mkdir ~/scripts
@@ -90,7 +90,7 @@ chmod +x ~/scripts/redos_workstation_setup_tool_cli.sh
 sudo ~/scripts/redos_workstation_setup_tool_cli.sh help
 ```
 
-### Запуск workstation tool из репозитория:
+### Запуск workstation tool из репозитория
 
 ```bash
 mkdir ~/scripts
@@ -356,9 +356,9 @@ sudo ./scripts/redos_workstation_setup_tool.sh
 8. Предлагает системные настройки: TRIM, KSG, синхронизацию времени и автоматические обновления.
 9. Предлагает перезагрузить систему после завершения.
 
-Пример выбора `ViPNet` на совместимой системе:
+### Пример выбора `ViPNet` на совместимой системе
 
-```text
+```bash
 Установить ViPNet? (y/n): y
 === Выбор версии ViPNet ===
 1. ViPNet Client (без деловой почты)
@@ -368,10 +368,9 @@ sudo ./scripts/redos_workstation_setup_tool.sh
 ✓ Установка ViPNet Client успешно выполнено
 ```
 
+### Пример поведения на РЕД ОС 8+
 
-Пример поведения на РЕД ОС 8+:
-
-```text
+```bash
 === Начало настройки РЕД ОС ===
 Обнаружена ОС: РЕД ОС 8.0
 Основная версия РЕД ОС: 8
