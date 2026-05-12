@@ -93,11 +93,13 @@ sudo ~/scripts/redos_workstation_setup_tool_cli.sh help
 ### Запуск workstation tool из репозитория:
 
 ```bash
+mkdir ~/scripts
+cd ~/scripts
 curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh
 curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh.sha256
-sha256sum -c scripts/redos_workstation_setup_tool.sh.sha256
-chmod +x scripts/redos_workstation_setup_tool.sh
-sudo ./scripts/redos_workstation_setup_tool.sh
+sha256sum -c ~/scripts/redos_workstation_setup_tool.sh.sha256
+chmod +x ~/scripts/redos_workstation_setup_tool.sh
+sudo ~/scripts/redos_workstation_setup_tool.sh
 ```
 
 ## CLI
