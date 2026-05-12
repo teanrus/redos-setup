@@ -313,7 +313,7 @@ get_release_asset_url() {
 
 get_latest_release_url() {
     local file_name="$1"
-    echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/latest/download/$file_name"
+    echo "https://github.com/$GITHUB_USER/$GITHUB_REPO/releases/download/latest/$file_name"
 }
 
 get_assets_release_url() {

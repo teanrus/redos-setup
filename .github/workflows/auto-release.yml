@@ -91,14 +91,22 @@ jobs:
             echo "## Quick start"
             echo ""
             echo '```bash'
-            echo 'curl -sL https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh | sudo bash'
+            echo 'mkdir -p ~/scripts'
+            echo 'cd ~/scripts'
+            echo 'curl -fLO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
+            echo 'curl -fLO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
+            echo 'sha256sum -c redos_workstation_setup_tool_cli.sh.sha256'
+            echo 'chmod +x redos_workstation_setup_tool_cli.sh'
+            echo 'sudo ./redos_workstation_setup_tool_cli.sh help'
             echo '```'
             echo ""
             echo "## Verify checksum"
             echo ""
             echo '```bash'
-            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
-            echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
+            echo 'mkdir -p ~/scripts'
+            echo 'cd ~/scripts'
+            echo 'curl -fLO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
+            echo 'curl -fLO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
             echo 'sha256sum -c redos_workstation_setup_tool_cli.sh.sha256'
             echo '```'
             if [ -f release-assets/redos_workstation_setup_tool_cli.sh ]; then
@@ -106,8 +114,10 @@ jobs:
               echo "## CLI quick start"
               echo ""
               echo '```bash'
-              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
-              echo 'curl -LO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
+              echo 'mkdir -p ~/scripts'
+              echo 'cd ~/scripts'
+              echo 'curl -fLO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh'
+              echo 'curl -fLO https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/redos_workstation_setup_tool_cli.sh.sha256'
               echo 'sha256sum -c redos_workstation_setup_tool_cli.sh.sha256'
               echo 'chmod +x redos_workstation_setup_tool_cli.sh'
               echo 'sudo ./redos_workstation_setup_tool_cli.sh help'

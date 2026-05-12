@@ -64,27 +64,33 @@
 
 ## Быстрый старт
 
-Запуск напрямую из последнего релиза:
+### Запуск напрямую из последнего релиза:
+
+#### CLI с командами и флагами
 
 ```bash
-# CLI с командами и флагами
 curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh | sudo bash
+```
 
-# интерактивный workstation-сценарий
+#### интерактивный workstation-сценарий
+
+```bash
 curl -sL https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh | sudo bash
 ```
 
-Запуск нового CLI из последнего релиза и проверка контрольной суммы:
+### Запуск нового CLI из последнего релиза и проверка контрольной суммы:
 
 ```bash
+mkdir ~/scripts
+cd ~/scripts
 curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh
 curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool_cli.sh.sha256
-sha256sum -c scripts/redos_workstation_setup_tool_cli.sh.sha256
-chmod +x scripts/redos_workstation_setup_tool_cli.sh
-sudo ./scripts/redos_workstation_setup_tool_cli.sh help
+sha256sum -c ~/scripts/redos_workstation_setup_tool_cli.sh.sha256
+chmod +x ~/scripts/redos_workstation_setup_tool_cli.sh
+sudo ~/scripts/redos_workstation_setup_tool_cli.sh help
 ```
 
-Запуск workstation tool из репозитория:
+### Запуск workstation tool из репозитория:
 
 ```bash
 curl -LO https://github.com/teanrus/redos-setup/releases/latest/download/scripts/redos_workstation_setup_tool.sh
