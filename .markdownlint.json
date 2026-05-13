@@ -3,7 +3,9 @@
     "line_length": 120,
     "code_blocks": false,
     "tables": false,
-    "headings": false
+    "headings": false,
+    "strict": false,
+    "stern": false
   },
   "MD033": {
     "allowed_elements": [
