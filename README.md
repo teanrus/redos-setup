@@ -8,6 +8,8 @@
 
 ![Logo](./assets/logo.png)
 
+<!-- markdownlint-disable no-inline-html -->
+
 ## Обзор
 
 Проект предназначен для сценариев, где требуется быстро подготовить рабочее место на РЕД ОС с повторяемой последовательностью действий:
@@ -106,7 +108,8 @@ sudo ~/scripts/redos_workstation_setup_tool.sh
 
 Файл `scripts/redos_workstation_setup_tool_cli.sh` предоставляет основной CLI-интерфейс проекта.
 
-Поддерживаемые команды:
+<details>
+<summary>Поддерживаемые команды</summary>
 
 - `help` - показать справку;
 - `version` - показать версию CLI;
@@ -116,8 +119,11 @@ sudo ~/scripts/redos_workstation_setup_tool.sh
 - `remove <component>` - удалить установленный компонент или настройку, если поддерживается (alias: `uninstall`);
 - `doctor` - выполнить базовую диагностику окружения;
 - `interactive` - запустить workstation-сценарий, близкий по возможностям к `scripts/redos_workstation_setup_tool.sh`.
+  
+</details>
 
-Поддерживаемые компоненты CLI:
+<details>
+<summary>Поддерживаемые компоненты CLI</summary>
 
 - `base` - базовая подготовка системы: обновление системы и, на `РЕД ОС 7.x`, обновление ядра;
 - `update-system` - обновить систему;
@@ -141,7 +147,10 @@ sudo ~/scripts/redos_workstation_setup_tool.sh
 - `auto-update` - настроить автоматическое обновление через `systemd timer`;
 - `all` - выполнить все совместимые компоненты и шаги.
 
-Список компонентов, поддерживающих автоматическое удаление:
+</details>
+
+<details>
+<summary>Список компонентов, поддерживающих автоматическое удаление</summary>
 
 - `yandex-browser`
 - `r7-office`
@@ -161,11 +170,18 @@ sudo ~/scripts/redos_workstation_setup_tool.sh
 - `auto-update`
 - `all`
 
+</details>
+
 ### Примеры использования CLI
 
 #### Показать справку
 
+<details>
+<summary>demo</summary>
+
 ![demo_help](./assets/help.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh help
@@ -175,17 +191,27 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh help
 
 #### Показать версию CLI
 
+<details>
+<summary>demo</summary>
+
+![demo_version](./assets/version.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh version
 ```
-
-![demo_version](./assets/version.svg)
 
 ---
 
 #### Проверить определение ОС и совместимость
 
+<details>
+<summary>demo</summary>
+
 ![demo_check_os](./assets/check_os.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh check-os
@@ -195,7 +221,12 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh check-os
 
 #### Показать все компоненты
 
+<details>
+<summary>demo</summary>
+
 ![demo_list](./assets/list.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh list
@@ -205,35 +236,57 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh list
 
 #### Показать только совместимые компоненты
 
+<details>
+<summary>demo</summary>
+
+![demo_list_compatible](./assets/list_compatible.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh list --compatible
 ```
-
-![demo_list_compatible](./assets/list_compatible.svg)
 
 ---
 
 #### Установить базовую систему
 
+<details>
+<summary>demo</summary>
+
+![demo_install_base](./assets/install_base.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install base
 ```
-
-![demo_install_base](./assets/install_base.svg)
 
 ---
 
 #### Обновить систему отдельной командой
 
+<details>
+<summary>demo</summary>
+
+![demo_install_update_system](./assets/install_update_system.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install update-system
 ```
 
-![demo_install_update_system](./assets/install_update_system.svg)
-
 ---
 
 #### Обновить ядро на `РЕД ОС 7.x`
+
+<details>
+<summary>demo</summary>
+
+![demo_install_kernel](./assets/install_kernel.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install kernel
@@ -243,6 +296,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install kernel
 
 #### Установить Яндекс.Браузер
 
+<details>
+<summary>demo</summary>
+
+![demo_install_yandex_browser](./assets/install_yandex_browser.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install yandex-browser
 ```
@@ -250,6 +310,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install yandex-browser
 ---
 
 #### Установить R7 Office
+
+<details>
+<summary>demo</summary>
+
+![demo_install_r7_office](./assets/install_r7_office.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install r7-office
@@ -259,6 +326,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install r7-office
 
 #### Установить MAX
 
+<details>
+<summary>demo</summary>
+
+![demo_install_max](./assets/install_max.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install max
 ```
@@ -266,6 +340,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install max
 ---
 
 #### Установить Chromium-GOST
+
+<details>
+<summary>demo</summary>
+
+![demo_install_chromium_gost](./assets/install_chromium_gost.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install chromium-gost
@@ -275,6 +356,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install chromium-gost
 
 #### Установить ViPNet Client
 
+<details>
+<summary>demo</summary>
+
+![demo_install_vipnet_variant_client](./assets/install_vipnet_variant_client.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant client
 ```
@@ -282,6 +370,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant clie
 ---
 
 #### Установить ViPNet + Деловая почта
+
+<details>
+<summary>demo</summary>
+
+![demo_install_vipnet_variant_dp](./assets/install_vipnet_variant_dp.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant dp
@@ -291,6 +386,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant dp
 
 #### Установить все совместимые компоненты без подтверждений
 
+<details>
+<summary>demo</summary>
+
+![demo_yes_install_all](./assets/yes_install_all.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh --yes install all
 ```
@@ -298,6 +400,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh --yes install all
 ---
 
 #### Показать план действий без изменений
+
+<details>
+<summary>demo</summary>
+
+![demo_dry_run_install_base](./assets/dry_run_install_base.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh --dry-run install base
@@ -307,6 +416,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh --dry-run install base
 
 #### Настроить время и `chrony`
 
+<details>
+<summary>demo</summary>
+
+![demo_install_timedate](./assets/install_timedate.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install timedate
 ```
@@ -314,6 +430,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install timedate
 ---
 
 #### Настроить автоматические обновления
+
+<details>
+<summary>demo</summary>
+
+![demo_install_auto_update](./assets/install_auto_update.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install auto-update
@@ -323,6 +446,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install auto-update
 
 #### Запустить диагностику
 
+<details>
+<summary>demo</summary>
+
+![demo_doctor](./assets/doctor.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh doctor
 ```
@@ -331,6 +461,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh doctor
 
 #### Удалить установленный компонент
 
+<details>
+<summary>demo</summary>
+
+![demo_remove_vipnet](./assets/remove_vipnet.svg)
+
+</details>
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh remove vipnet
 ```
@@ -338,6 +475,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh remove vipnet
 ---
 
 #### Запустить интерактивный workstation-режим
+
+<details>
+<summary>demo</summary>
+
+![demo_interactive](./assets/interactive.svg)
+
+</details>
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh interactive
@@ -361,7 +505,8 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh interactive
 
 Файл `scripts/redos_workstation_setup_tool.sh` предназначен для интерактивной подготовки рабочей станции РЕД ОС. Он охватывает не только установку ПО, но и эксплуатационные настройки, которые обычно выполняются после развёртывания системы. В отличие от `scripts/redos_workstation_setup_tool_cli.sh`, этот сценарий не требует отдельных команд и ведёт пользователя по шагам в полностью интерактивном режиме.
 
-Что умеет сценарий:
+<details>
+<summary>Что умеет сценарий</summary>
 
 - обновлять систему и, для РЕД ОС 7.x, предлагать обновление ядра через `redos-kernels6`;
 - устанавливать прикладное ПО: Яндекс.Браузер, R7 Office, MAX, Среда, Chromium-GOST, Liberation Fonts, Kaspersky Agent, ViPNet, 1С;
@@ -370,6 +515,8 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh interactive
 - настраивать время: выбор часового пояса, отключение встроенного NTP, установка и конфигурация `chrony`, ожидание синхронизации;
 - настраивать автоматические обновления через `redos-auto-update`, `systemd service` и `systemd timer`;
 - предлагать перезагрузку после завершения настройки.
+
+</details>
 
 Пример запуска:
 
