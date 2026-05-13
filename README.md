@@ -165,15 +165,23 @@ sudo ~/scripts/redos_workstation_setup_tool.sh
 
 #### Показать справку
 
+![demo_help](./assets/redos_workstation_setup_tool_cli_help_x4.svg)
+
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh help
 ```
+
+---
 
 #### Показать версию CLI
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh version
 ```
+
+![demo_version](./assets/redos_workstation_setup_tool_cli_version_x4.svg)
+
+---
 
 #### Проверить определение ОС и совместимость
 
@@ -183,11 +191,17 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh version
 sudo ./scripts/redos_workstation_setup_tool_cli.sh check-os
 ```
 
+---
+
 #### Показать все компоненты
+
+![demo_list](./assets/redos_workstation_setup_tool_cli_list_x4.svg)
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh list
 ```
+
+---
 
 #### Показать только совместимые компоненты
 
@@ -195,11 +209,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh list
 sudo ./scripts/redos_workstation_setup_tool_cli.sh list --compatible
 ```
 
+---
+
 #### Установить базовую систему
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install base
 ```
+
+---
 
 #### Обновить систему отдельной командой
 
@@ -207,11 +225,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install base
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install update-system
 ```
 
+---
+
 #### Обновить ядро на `РЕД ОС 7.x`
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install kernel
 ```
+
+---
 
 #### Установить Яндекс.Браузер
 
@@ -219,11 +241,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install kernel
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install yandex-browser
 ```
 
+---
+
 #### Установить R7 Office
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install r7-office
 ```
+
+---
 
 #### Установить MAX
 
@@ -231,11 +257,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install r7-office
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install max
 ```
 
+---
+
 #### Установить Chromium-GOST
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install chromium-gost
 ```
+
+---
 
 #### Установить ViPNet Client
 
@@ -243,11 +273,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install chromium-gost
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant client
 ```
 
+---
+
 #### Установить ViPNet + Деловая почта
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant dp
 ```
+
+---
 
 #### Установить все совместимые компоненты без подтверждений
 
@@ -255,11 +289,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install vipnet --variant dp
 sudo ./scripts/redos_workstation_setup_tool_cli.sh --yes install all
 ```
 
+---
+
 #### Показать план действий без изменений
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh --dry-run install base
 ```
+
+---
 
 #### Настроить время и `chrony`
 
@@ -267,11 +305,15 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh --dry-run install base
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install timedate
 ```
 
+---
+
 #### Настроить автоматические обновления
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install auto-update
 ```
+
+---
 
 #### Запустить диагностику
 
@@ -279,17 +321,23 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install auto-update
 sudo ./scripts/redos_workstation_setup_tool_cli.sh doctor
 ```
 
+---
+
 #### Удалить установленный компонент
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh remove vipnet
 ```
 
+---
+
 #### Запустить интерактивный workstation-режим
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh interactive
 ```
+
+---
 
 ### Глобальные флаги CLI
 
