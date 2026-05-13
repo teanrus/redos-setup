@@ -165,7 +165,7 @@ sudo ~/scripts/redos_workstation_setup_tool.sh
 
 #### Показать справку
 
-![demo_help](./assets/redos_workstation_setup_tool_cli_help_x4.svg)
+![demo_help](./assets/help.svg)
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh help
@@ -179,13 +179,13 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh help
 sudo ./scripts/redos_workstation_setup_tool_cli.sh version
 ```
 
-![demo_version](./assets/redos_workstation_setup_tool_cli_version_x4.svg)
+![demo_version](./assets/version.svg)
 
 ---
 
 #### Проверить определение ОС и совместимость
 
-![demo_check_os](./assets/redos_workstation_setup_tool_cli_check_os.svg)
+![demo_check_os](./assets/check_os.svg)
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh check-os
@@ -195,7 +195,7 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh check-os
 
 #### Показать все компоненты
 
-![demo_list](./assets/redos_workstation_setup_tool_cli_list_x4.svg)
+![demo_list](./assets/list.svg)
 
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh list
@@ -209,6 +209,8 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh list
 sudo ./scripts/redos_workstation_setup_tool_cli.sh list --compatible
 ```
 
+![demo_list_compatible](./assets/list_compatible.svg)
+
 ---
 
 #### Установить базовую систему
@@ -217,6 +219,8 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh list --compatible
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install base
 ```
 
+![demo_install_base](./assets/install_base.svg)
+
 ---
 
 #### Обновить систему отдельной командой
@@ -224,6 +228,8 @@ sudo ./scripts/redos_workstation_setup_tool_cli.sh install base
 ```bash
 sudo ./scripts/redos_workstation_setup_tool_cli.sh install update-system
 ```
+
+![demo_install_update_system](./assets/install_update_system.svg)
 
 ---
 
