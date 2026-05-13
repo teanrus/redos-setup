@@ -8,7 +8,7 @@
 
 ![Logo](./assets/logo.png)
 
-<!-- markdownlint-disable no-inline-html -->  
+<!-- markdownlint-disable no-inline-html -->
 
 ## Обзор
 
